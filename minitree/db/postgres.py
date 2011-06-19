@@ -48,7 +48,9 @@ class HStoreSyntaxError(Exception):
 
 class Postgres(object):
 
-    selectSQL = "SELECT node_value FROM %s WHERE node_path = %%s"
+    selectSQL = "SELECT key, value FROM each( \
+(SELECT node_value FROM %s WHERE node_path = %%s LIMIT 1))"
+
     selectAncestorSQL = "SELECT node_value FROM %s \
 WHERE node_path @> %%s ORDER BY node_path ASC"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s \
@@ -79,7 +81,7 @@ node_path ltree unique, node_value hstore)"
     @staticmethod
     def _convert(result):
         if result:
-            return Postgres._parse_hstore(result[0][0])
+            return dict(map(lambda x: (x[0], x[1]), result))
         else:
             raise NodeNotFound()
 
@@ -203,7 +205,7 @@ node_path ltree unique, node_value hstore)"
         schema, table, node_path = self._splitPath(path)
         tablename = Postgres._buildTableName(schema, table)
         d = self.pool.runQuery(self.selectSQL % tablename, [node_path])
-        d.addCallback(lambda x: deferToThread(Postgres._convert, x))
+        d.addCallback(Postgres._convert)
         return d
 
     def _createNode(self, txn, path, content, ncall=0):
