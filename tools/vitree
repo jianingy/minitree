@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+# -*- python -*-
+from yaml import safe_load as yaml_load, safe_dump as yaml_dump
+from cjson import decode as json_decode, encode as json_encode
+from tempfile import mkstemp
+from urllib2 import urlopen
+import os
+
+node_server = "http://localhost:8000"
+
+def _edit(node_path, filename = None):
+
+    editor = os.environ["EDITOR"]
+
+    url = node_server + "/node/" + node_path.replace(".", "/").rstrip("/")
+    json = urlopen(url).read()
+    yaml = "---\n"
+    yaml = yaml + yaml_dump(json_decode(json), default_flow_style=False)
+
+    if not filename:
+        fd, filename = mkstemp(prefix="vitree-")
+        os.close(fd)
+        with open(filename, "w") as f:
+            f.write(yaml)
+
+    os.system("%s '%s'" % (editor, filename))
+    try:
+        with open(filename, "r") as f:
+            new_yaml = yaml_load(f.read())
+            new_json = json_encode(new_yaml)
+    except Exception as e:
+        print "Error: ", str(e)
+        return (False, filename)
+
+    if new_yaml == yaml:
+        print "no changes found"
+        return (True, filename)
+    try:
+        ret = urlopen(url, new_json)
+    except Exception as e:
+        print "Error: ", str(e.code)
+        return (False, filename)
+
+    ret_code = ret.getcode()
+    ret_json = json_decode(ret.read())
+    if ret_code == 200:
+        print ret_json["success"]
+        return (True, filename)
+    else:
+        print ret_json["error"]
+
+    return (False, filename)
+
+def edit(node_path):
+    filename = None
+    while True:
+        (success, filename) = _edit(node_path, filename)
+        if success:
+            os.unlink(filename)
+            break
+        act = raw_input("press 'a' to abort, press other key to edit again: ")
+        if act.lower() == 'a':
+            if filename: os.unlink(filename)
+            break
+
+if __name__ == '__main__':
+    import sys
+    edit(sys.argv[1])
+
