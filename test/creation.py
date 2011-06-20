@@ -44,6 +44,19 @@ class TestCreateFunctions(unittest.TestCase):
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
+    def test_create_retval_invalid_data(self):
+        data = "Invalid Data"
+        code = 200
+        try:
+            url_access(self.base + "/node/test/table/retval/invalid/data",
+                       data, "PUT").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 400)
+        self.assertTrue("JSON" in ret)
+
     def test_create_retval_trailing(self):
         data = dict(key_a="value_a")
         data[u"中文键"] = u"中文值"

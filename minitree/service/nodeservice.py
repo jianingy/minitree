@@ -5,6 +5,7 @@ from twisted.python import log
 from twisted.python.failure import Failure
 from minitree.db.postgres import dbBackend
 from cjson import encode as json_encode, decode as json_decode
+import cjson
 import time
 import minitree.db
 import logging
@@ -12,6 +13,23 @@ import logging
 
 class UnsupportedGetNodeMethod(Exception):
     pass
+
+
+class InvalidInputData(Exception):
+
+    def __init__(self, message=""):
+        self.value = "the input data must be a JSON dict"
+        if message:
+            self.value = message
+
+    def __repr__(self):
+        return self.value
+
+    def __str__(self):
+        return str(self.value)
+
+    def __unicode__(self):
+        return unicode(self.value)
 
 
 class NodeService(Resource):
@@ -42,10 +60,13 @@ class NodeService(Resource):
 
     def createNode(self, content, node_path):
         # content must be first argument
+
         def _success(rowcount):
             return dict(success="%d node(s) has been created" % rowcount,
                         affected=rowcount)
 
+        if not isinstance(content, dict):
+            raise InvalidInputData()
         d = dbBackend.createNode(node_path, content)
         d.addCallback(_success)
         return d
@@ -86,7 +107,11 @@ class NodeService(Resource):
             elif isinstance(err, minitree.db.PathDuplicatedError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
-            elif isinstance(err, minitree.db.InvalidPathError):
+            elif (isinstance(err, minitree.db.InvalidPathError) or
+                  isinstance(err, cjson.DecodeError)):
+                request.setResponseCode(400)
+                error = dict(error=str(err))
+            elif isinstance(err, InvalidInputData):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
             elif isinstance(err, ValueError):
@@ -106,6 +131,9 @@ class NodeService(Resource):
         def _success(rowcount):
             return dict(success="%d node(s) has been modified" % rowcount,
                         affected=rowcount)
+
+        if not isinstance(content, dict):
+            raise InvalidInputData()
 
         d = dbBackend.updateNode(node_path, content)
         d.addCallback(_success)
