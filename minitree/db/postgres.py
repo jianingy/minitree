@@ -246,7 +246,8 @@ node_path ltree unique, node_value hstore)"
             return txn._cursor.rowcount
         elif node_path:
             if cascade:
-                txn.execute(self.deleteNodeCascadedSQL % tablename, [node_path])
+                txn.execute(self.deleteNodeCascadedSQL % tablename,
+                            [node_path])
             else:
                 txn.execute(self.deleteNodeSQL % tablename, [node_path])
             return txn._cursor.rowcount
