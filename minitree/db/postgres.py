@@ -50,6 +50,9 @@ class Postgres(object):
 
     selectSQL = "SELECT key, value FROM each( \
 (SELECT node_value FROM %s WHERE node_path = %%s LIMIT 1))"
+    selectOverrideSQL = "SELECT key, value FROM each( \
+(SELECT hstore_override(node_value order by node_path asc) AS node_value \
+FROM %s WHERE node_path @> %%s))"
 
     selectAncestorSQL = "SELECT node_value FROM %s \
 WHERE node_path @> %%s ORDER BY node_path ASC"
@@ -152,6 +155,9 @@ last_modification timestamp default now())"
 
     def getOverridedNode(self, path):
 
+        return self.pool.runInteraction(self._selectNode, path,
+                                        self.selectOverrideSQL)
+
         def _update(x, y):
             x.update(y)
             return x
@@ -197,14 +203,16 @@ last_modification timestamp default now())"
 
         return d
 
-    def _selectNode(self, txn, path):
+    def _selectNode(self, txn, path, sql):
         schema, table, node_path = self._splitPath(path)
         tablename = Postgres._buildTableName(schema, table)
         try:
-            txn.execute(self.selectSQL % tablename, [node_path])
+            txn.execute(sql % tablename, [node_path])
             result = txn.fetchall()
             if result:
-                return dict(map(lambda x: (x[0], x[1]), result))
+                return dict(map(lambda x: (x[0].decode("UTF-8"),
+                                           x[1].decode("UTF-8")),
+                                result))
             else:
                 raise NodeNotFound()
         except psycopg2.ProgrammingError as e:
@@ -218,7 +226,7 @@ last_modification timestamp default now())"
                 raise
 
     def selectNode(self, path):
-        return self.pool.runInteraction(self._selectNode, path)
+        return self.pool.runInteraction(self._selectNode, path, self.selectSQL)
 
     def _createNode(self, txn, path, content, ncall=0):
         if ncall > 3:
