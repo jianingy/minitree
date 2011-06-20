@@ -23,7 +23,7 @@ class NodeService(Resource):
 
     @staticmethod
     def _buildQuery(request):
-        uri = request.path[len(NodeService.serviceName) + 1:]
+        uri = request.path[len(NodeService.serviceName) + 1:].rstrip("/")
 
         if uri.find(".") > -1:
             node_path, format = uri.split(".", 1)

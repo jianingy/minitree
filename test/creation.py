@@ -43,6 +43,12 @@ class TestCreateFunctions(unittest.TestCase):
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
+    def test_create_retval_trailing(self):
+        data = dict(key_a="value_a", key_b=u"中文")
+        ret = url_access(self.base + "/node/test/table/retval/trailing/",
+                         json_encode(data), "PUT").read()
+        self.assertTrue("success" in ret)
+
     def test_create_retval_wrong_type_1(self):
         """dict value should not be acceptable"""
         data = dict(key_a=dict(key_a=1), key_b=u"中文")
