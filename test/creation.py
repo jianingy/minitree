@@ -38,35 +38,39 @@ class TestCreateFunctions(unittest.TestCase):
             self.conn.rollback()
 
     def test_create_retval_success(self):
-        data = dict(key_a="value_a", key_b=u"中文")
+        data = dict(key_a="value_a")
+        data[u"中文键"] = u"中文值"
         ret = url_access(self.base + "/node/test/table/retval/success",
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
     def test_create_retval_trailing(self):
-        data = dict(key_a="value_a", key_b=u"中文")
+        data = dict(key_a="value_a")
+        data[u"中文键"] = u"中文值"
         ret = url_access(self.base + "/node/test/table/retval/trailing/",
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
     def test_create_retval_wrong_type_1(self):
         """dict value should not be acceptable"""
-        data = dict(key_a=dict(key_a=1), key_b=u"中文")
+        data = dict(key_a=dict(key_a=1))
+        data[u"中文键"] = u"中文值"
         ret = url_access(self.base + "/node/test/table/retval/wrong/type/1",
                          json_encode(data), "PUT").read()
         self.assertTrue("error" in ret)
 
     def test_create_retval_wrong_type_2(self):
         """list value should not be acceptable"""
-        data = dict(key_a=[1, 2], key_b=u"中文")
+        data = dict(key_a=[1, 2])
+        data[u"中文键"] = u"中文值"
         ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
                          json_encode(data), "PUT").read()
         self.assertTrue("error" in ret)
 
     def test_create_retval_dup(self):
         code = 200
-        data = dict(key_a="value_a", key_b=u"中文")
-
+        data = dict(key_a="value_a")
+        data[u"中文键"] = u"中文值"
         url_access(self.base + "/node/test/table/retval/dup",
                    json_encode(data), "PUT")
         try:
@@ -82,10 +86,11 @@ class TestCreateFunctions(unittest.TestCase):
 
     def test_create_dbval(self):
         cursor = self.conn.cursor()
-        data = dict(key_a="value_a", key_b=u"中文")
+        data = dict(key_a="value_a")
+        data[u"中文键"] = u"中文值"
         url_access(self.base + "/node/test/table/dbval/a/b/c",
                    json_encode(data), method="PUT").read()
         cursor.execute("SELECT node_value FROM test.table \
 WHERE node_path='dbval.a.b.c' LIMIT 1")
         data = cursor.fetchall()
-        self.assertEqual(data[0][0], '"key_a"=>"value_a", "key_b"=>"中文"')
+        self.assertEqual(data[0][0], '"key_a"=>"value_a", "中文键"=>"中文值"')
