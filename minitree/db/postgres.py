@@ -53,16 +53,19 @@ class Postgres(object):
 
     selectAncestorSQL = "SELECT node_value FROM %s \
 WHERE node_path @> %%s ORDER BY node_path ASC"
-    updateSQL = "UPDATE %s SET node_value = node_value || %%s \
+    updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
+last_modification = now() \
 WHERE node_path = %%s"
-    deleteSQL = "UPDATE %s SET node_value = delete(node_value, %%s) \
+    deleteSQL = "UPDATE %s SET node_value = delete(node_value, %%s), \
+last_modification = now() \
 WHERE node_path = %%s"
     deleteNodeSQL = "DELETE FROM %s WHERE node_path = %%s"
     deleteNodeCascadedSQL = "DELETE FROM %s WHERE node_path <@ %%s"
     dropTableSQL = "DROP TABLE %s"
     createSQL = "INSERT INTO %s(node_path, node_value) VALUES(%%s, %%s)"
     createTableSQL = "CREATE TABLE %s(id SERIAL PRIMARY KEY, \
-node_path ltree unique, node_value hstore)"
+node_path ltree unique, node_value hstore, \
+last_modification timestamp default now())"
     createSchemaSQL = "CREATE SCHEMA %s"
 
     regexNoTable = re.compile(r"relation \"[^\"]+\" does not exist")
