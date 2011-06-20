@@ -3,7 +3,7 @@
 from yaml import safe_load as yaml_load, safe_dump as yaml_dump
 from cjson import decode as json_decode, encode as json_encode
 from tempfile import mkstemp
-from urllib2 import urlopen
+from urllib2 import urlopen, HTTPError
 import os
 
 node_server = "http://localhost:8000"
@@ -24,13 +24,15 @@ def _edit(resource_path, tmpfile):
     with open(tmpfile, "r") as f:
         modifed_yaml = yaml_load(f.read())
         modifed_json = json_encode(modifed_yaml)
-        ret = urlopen(url, modifed_json)
+        ret = urlopen(resource_path, modifed_json)
         ret_code = ret.getcode()
         ret_json = json_decode(ret.read())
         if ret_code == 200:
             print ret_json["success"]
+            return True
         else:
             print ret_json["error"]
+            return False
 
 def node2resource(node_path):
     return "/node/" + node_path.replace(".", "/").rstrip("/")
@@ -39,14 +41,18 @@ def edit(node_path):
     resource_path = node_server.rstrip("/") + node2resource(node_path)
     fd, tmpfile = mkstemp(prefix="vitree-")
     os.close(fd)
-    success = False
-    while not success:
+    while True:
         try:
             _edit(resource_path, tmpfile)
+            break
+        except HTTPError as e:
+            print "ERROR:", json_decode(e.read())["error"]
+            break
         except:
             raise
         finally:
-            os.unlink(tmpfile)
+            if os.path.exists(tmpfile):
+                os.unlink(tmpfile)
 
 if __name__ == '__main__':
     import sys

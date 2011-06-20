@@ -86,6 +86,9 @@ class NodeService(Resource):
             elif isinstance(err, minitree.db.PathDuplicatedError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
+            elif isinstance(err, minitree.db.InvalidPathError):
+                request.setResponseCode(400)
+                error = dict(error=str(err))
             elif isinstance(err, ValueError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
