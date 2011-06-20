@@ -82,13 +82,6 @@ last_modification timestamp default now())"
         return "\"%s\".\"%s\"" % (_quote(schema), _quote(table))
 
     @staticmethod
-    def _convert(result):
-        if result:
-            return dict(map(lambda x: (x[0], x[1]), result))
-        else:
-            raise NodeNotFound()
-
-    @staticmethod
     def _parse_hstore(hstore_str):
         """
         Parse an hstore from it's literal string representation.
@@ -204,12 +197,28 @@ last_modification timestamp default now())"
 
         return d
 
-    def selectNode(self, path):
+    def _selectNode(self, txn, path):
         schema, table, node_path = self._splitPath(path)
         tablename = Postgres._buildTableName(schema, table)
-        d = self.pool.runQuery(self.selectSQL % tablename, [node_path])
-        d.addCallback(Postgres._convert)
-        return d
+        try:
+            txn.execute(self.selectSQL % tablename, [node_path])
+            result = txn.fetchall()
+            if result:
+                return dict(map(lambda x: (x[0], x[1]), result))
+            else:
+                raise NodeNotFound()
+        except psycopg2.ProgrammingError as e:
+            err = unicode(e)
+            txn.execute("ROLLBACK")
+            if self.regexNoSchema.match(err):
+                raise NodeNotFound("schema not found")
+            elif self.regexNoTable.match(err):
+                raise NodeNotFound("collection not found")
+            else:
+                raise
+
+    def selectNode(self, path):
+        return self.pool.runInteraction(self._selectNode, path)
 
     def _createNode(self, txn, path, content, ncall=0):
         if ncall > 3:
