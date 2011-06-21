@@ -48,7 +48,7 @@ class TestSelectFunctions(unittest.TestCase):
         ret = url_access(self.base
                          + "/node/test/table/a/b?method=ancestors").read()
         data = json_decode(ret)
-        self.assertEqual(data, ["", "a"])
+        self.assertEqual(data, ["test.table", "test.table.a"])
 
     def test_select_ancestors_nonexists(self):
         code = 200
@@ -66,7 +66,7 @@ class TestSelectFunctions(unittest.TestCase):
         ret = url_access(self.base
                          + "/node/test/table/a?method=children").read()
         data = json_decode(ret)
-        self.assertEqual(data, ["a.b"])
+        self.assertEqual(data, ["test.table.a.b"])
 
     def test_select_children_nonexists(self):
         code = 200

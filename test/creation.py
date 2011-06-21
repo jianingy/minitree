@@ -38,7 +38,7 @@ class TestCreateFunctions(unittest.TestCase):
             self.conn.rollback()
 
     def test_create_retval_success(self):
-        data = dict(key_a="value_a")
+        data = dict(key_a="value_a", key_b="\"H\"'E'%l%@l@(e)")
         data[u"中文键"] = u"中文值"
         ret = url_access(self.base + "/node/test/table/retval/success",
                          json_encode(data), "PUT").read()

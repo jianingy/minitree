@@ -126,13 +126,24 @@ last_modification timestamp default now())"
             else:
                 raise
 
+    def _patch_path_heading(self, value, path):
+        schema, table, node_path = self._splitPath(path)
+        return map(lambda x: ("%s.%s.%s" % (schema, table, x)).rstrip("."),
+                   value)
+
     def getAncestors(self, path):
-        return self.pool.runInteraction(self._selectPath, path,
-                                        self.selectAncestorSQL)
+        d = self.pool.runInteraction(self._selectPath, path,
+                                     self.selectAncestorSQL)
+        d.addCallback(self._patch_path_heading, path)
+
+        return d
 
     def getChildren(self, path):
-        return self.pool.runInteraction(self._selectPath, path,
-                                        self.selectChildrenSQL)
+        d = self.pool.runInteraction(self._selectPath, path,
+                                     self.selectChildrenSQL)
+        d.addCallback(self._patch_path_heading, path)
+
+        return d
 
     def getOverridedNode(self, path):
         d = self.pool.runInteraction(self._selectNode, path,
