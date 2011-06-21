@@ -116,3 +116,99 @@ class TestSelectFunctions(unittest.TestCase):
 
         self.assertEqual(code, 400)
         self.assertTrue("error" in ret)
+
+    def test_select_node_non_exist_override(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test/table/x/y/z?method=override").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_schema_non_exist_override(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test_test/table/x/y/z?method=override").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_table_non_exist_override(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test/table_table/x/y/z?method=override").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_table_invalid_path_override(self):
+        code = 200
+        try:
+            url_access(self.base
+                       + "/node/invalid?method=override").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 400)
+        self.assertTrue("error" in ret)
+
+    def test_select_node_non_exist_combo(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test/table/x/y/z?method=combo").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_schema_non_exist_combo(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test_test/table/x/y/z?method=combo").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_table_non_exist_combo(self):
+        code = 200
+        try:
+            url_access(self.base +
+                       "/node/test/table_table/x/y/z?method=combo").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_table_invalid_path_combo(self):
+        code = 200
+        try:
+            url_access(self.base
+                       + "/node/invalid?method=combo").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 400)
+        self.assertTrue("error" in ret)

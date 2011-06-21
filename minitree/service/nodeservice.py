@@ -86,6 +86,10 @@ class NodeService(Resource):
             d = dbBackend.getOverridedNode(node_path)
         elif method == 'combo':
             d = dbBackend.getComboNode(node_path)
+        elif method == 'ancestors':
+            d = dbBackend.getAncestors(node_path)
+        elif method == 'children':
+            d = dbBackend.getChildren(node_path)
         else:
             raise UnsupportedGetNodeMethod()
         return d

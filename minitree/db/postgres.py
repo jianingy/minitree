@@ -1,28 +1,11 @@
-from twisted.internet.threads import deferToThread
 from twisted.enterprise import adbapi
 from minitree.db import InvalidPathError, NodeNotFound, NodeCreationError
 from minitree.db import PathDuplicatedError
+from collections import defaultdict
 import psycopg2
 import re
 
 __all__ = ["dbBackend"]
-
-HSTORE_PAIR_RE = re.compile(r"""
-    (
-        (?P<key> [^" ] [^= ]* )            # Unquoted keys
-      | " (?P<key_q> ([^"] | \\ . )* ) "   # Quoted keys
-    )
-    [ ]* => [ ]*    # Pair operator, optional adjoining whitespace
-    (
-        (?P<value> [^" ] [^, ]* )          # Unquoted values
-      | " (?P<value_q> ([^"] | \\ . )* ) " # Quoted values
-    )
-    """, re.VERBOSE)
-
-HSTORE_DELIMITER_RE = re.compile(r"""
-    [ ]* , [ ]*
-    """, re.VERBOSE)
-
 
 class HStoreSyntaxError(Exception):
     """Indicates an error unmarshalling an hstore value."""
@@ -53,9 +36,12 @@ class Postgres(object):
     selectOverrideSQL = "SELECT key, value FROM each( \
 (SELECT hstore_override(node_value order by node_path asc) AS node_value \
 FROM %s WHERE node_path @> %%s))"
-
-    selectAncestorSQL = "SELECT node_value FROM %s \
+    selectComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
+FROM %s WHERE node_path @> %%s"
+    selectAncestorSQL = "SELECT node_path, node_value FROM %s \
 WHERE node_path @> %%s ORDER BY node_path ASC"
+    selectChildrenSQL = "SELECT node_path, node_value FROM %s \
+WHERE node_path <@ %%s ORDER BY node_path ASC"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
 last_modification = now() \
 WHERE node_path = %%s"
@@ -85,43 +71,6 @@ last_modification timestamp default now())"
         return "\"%s\".\"%s\"" % (_quote(schema), _quote(table))
 
     @staticmethod
-    def _parse_hstore(hstore_str):
-        """
-        Parse an hstore from it's literal string representation.
-
-        Attempts to approximate PG's hstore input parsing rules as
-        closely as possible. Although currently this is not strictly
-        necessary, since the current implementation of hstore's output
-        syntax is stricter than what it accepts as input, the
-        documentation makes no guarantees that will always be the
-        case.
-
-        Throws HStoreSyntaxError if parsing fails.
-        """
-        result = {}
-        pos = 0
-        pair_match = HSTORE_PAIR_RE.match(hstore_str)
-
-        while pair_match is not None:
-            key = pair_match.group('key') or pair_match.group('key_q')
-            key = key.decode('UTF-8')
-            value = pair_match.group('value') or pair_match.group('value_q')
-            value = value.decode('UTF-8')
-            result[key] = value
-            pos += pair_match.end()
-
-            delim_match = HSTORE_DELIMITER_RE.match(hstore_str[pos:])
-            if delim_match is not None:
-                pos += delim_match.end()
-
-            pair_match = HSTORE_PAIR_RE.match(hstore_str[pos:])
-
-        if pos != len(hstore_str):
-            raise HStoreSyntaxError(hstore_str, pos)
-
-        return result
-
-    @staticmethod
     def _serialize_hstore(val):
         """
         Serialize a dictionary into an hstore literal. Keys and values
@@ -149,57 +98,56 @@ last_modification timestamp default now())"
 
         return (schema, table, node_path)
 
+    def _selectPath(self, txn, path, sql):
+        schema, table, node_path = self._splitPath(path)
+        tablename = Postgres._buildTableName(schema, table)
+        try:
+            txn.execute(sql % tablename, [node_path])
+            result = txn.fetchall()
+            if result:
+                return map(lambda x: x[0], result)
+            else:
+                raise NodeNotFound()
+        except psycopg2.ProgrammingError as e:
+            err = unicode(e)
+            txn.execute("ROLLBACK")
+            if self.regexNoSchema.match(err):
+                raise NodeNotFound("schema not found")
+            elif self.regexNoTable.match(err):
+                raise NodeNotFound("collection not found")
+            else:
+                raise
+
     def connect(self, *args, **kwargs):
         assert(self.pool == None)
         self.pool = adbapi.ConnectionPool("psycopg2", *args, **kwargs)
 
+    def getAncestors(self, path):
+        return self.pool.runInteraction(self._selectPath, path,
+                                        self.selectAncestorSQL)
+
+    def getChildren(self, path):
+        return self.pool.runInteraction(self._selectPath, path,
+                                        self.selectChildrenSQL)
+
     def getOverridedNode(self, path):
-
-        return self.pool.runInteraction(self._selectNode, path,
-                                        self.selectOverrideSQL)
-
-        def _update(x, y):
-            x.update(y)
-            return x
-
-        def _override(result):
-            return reduce(lambda x, y: _update(x, y),
-                          map(lambda x: self._parse_hstore(x[0]), result))
-
-        schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
-        d = self.pool.runQuery(self.selectAncestorSQL % tablename, [node_path])
-        d.addCallback(lambda x: deferToThread(_override, x))
-
+        d = self.pool.runInteraction(self._selectNode, path,
+                                     self.selectOverrideSQL)
+        d.addCallback(lambda r: dict(map(lambda x: (x[0].decode("UTF-8"),
+                                                    x[1].decode("UTF-8")), r)))
         return d
 
     def getComboNode(self, path):
 
-        def _concat(x, y, m):
-            if m in x:
-                l = ([x[m]], x[m])[isinstance(x[m], list)]
-                if m in y:
-                    l.append(y[m])
-                    return (m, l)
-                else:
-                    return (m, l)
-            elif m in y:
-                return (m, [y[m]])
-            else:
-                raise Exception("What's wrong with your python")
-
-        def _combine(x, y):
-            return dict(map(lambda m: _concat(x, y, m),
-                            list(set(x.keys() + y.keys()))))
-
         def _combo(result):
-            return reduce(lambda x, y: _combine(x, y),
-                          map(lambda x: self._parse_hstore(x[0]), result))
+            combo = defaultdict(list)
+            map(lambda x: combo[x[0]].append(x[1].decode("UTF-8")), result)
+            print combo
+            return combo
 
-        schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
-        d = self.pool.runQuery(self.selectAncestorSQL % tablename, [node_path])
-        d.addCallback(lambda x: deferToThread(_combo, x))
+        d = self.pool.runInteraction(self._selectNode, path,
+                                     self.selectComboSQL)
+        d.addCallback(_combo)
 
         return d
 
@@ -210,9 +158,7 @@ last_modification timestamp default now())"
             txn.execute(sql % tablename, [node_path])
             result = txn.fetchall()
             if result:
-                return dict(map(lambda x: (x[0].decode("UTF-8"),
-                                           x[1].decode("UTF-8")),
-                                result))
+                return result
             else:
                 raise NodeNotFound()
         except psycopg2.ProgrammingError as e:
@@ -226,7 +172,10 @@ last_modification timestamp default now())"
                 raise
 
     def selectNode(self, path):
-        return self.pool.runInteraction(self._selectNode, path, self.selectSQL)
+        d = self.pool.runInteraction(self._selectNode, path, self.selectSQL)
+        d.addCallback(lambda r: dict(map(lambda x: (x[0].decode("UTF-8"),
+                                                    x[1].decode("UTF-8")), r)))
+        return d
 
     def _createNode(self, txn, path, content, ncall=0):
         if ncall > 3:
