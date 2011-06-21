@@ -5,6 +5,7 @@ from cjson import decode as json_decode, encode as json_encode
 from tempfile import mkstemp
 from urllib2 import HTTPError
 import os
+import codecs
 
 node_server = "http://localhost:8000"
 
@@ -22,7 +23,7 @@ def edit_file(tmpfile):
 def do_create(resource_path, tmpfile):
     edit_file(tmpfile)
 
-    with open(tmpfile, "r") as f:
+    with codecs.open(tmpfile, "r", encoding="utf-8") as f:
         modifed_yaml = yaml_load(f.read())
         modifed_json = json_encode(modifed_yaml)
         ret = urlopen(resource_path, modifed_json, "PUT")
@@ -39,14 +40,15 @@ def do_create(resource_path, tmpfile):
 def do_edit(resource_path, tmpfile):
 
     json = urlopen(resource_path).read()
-    yaml = yaml_dump(json_decode(json), default_flow_style=False)
+    yaml = yaml_dump(json_decode(json), default_flow_style=False, width=70,
+                     encoding="utf-8", explicit_start=True, allow_unicode=True)
 
     with open(tmpfile, "w") as f:
         f.write(yaml)
 
     edit_file(tmpfile)
 
-    with open(tmpfile, "r") as f:
+    with codecs.open(tmpfile, "r", encoding="utf-8") as f:
         modifed_yaml = yaml_load(f.read())
         modifed_json = json_encode(modifed_yaml)
         ret = urlopen(resource_path, modifed_json, "POST")
