@@ -4,6 +4,7 @@ from yaml import safe_load as yaml_load, safe_dump as yaml_dump
 from cjson import decode as json_decode, encode as json_encode
 from tempfile import mkstemp
 from urllib2 import HTTPError
+import yaml
 import os
 import codecs
 
@@ -39,12 +40,15 @@ def do_create(resource_path, tmpfile):
 
 def do_edit(resource_path, tmpfile):
 
-    json = urlopen(resource_path).read()
-    yaml = yaml_dump(json_decode(json), default_flow_style=False, width=70,
-                     encoding="utf-8", explicit_start=True, allow_unicode=True)
+    stat = os.stat(tmpfile)
+    if stat.st_ctime == stat.st_mtime:
+        json = urlopen(resource_path).read()
+        yaml = yaml_dump(json_decode(json), default_flow_style=False,
+                         width=70, encoding="utf-8",
+                         explicit_start=True, allow_unicode=True)
 
-    with open(tmpfile, "w") as f:
-        f.write(yaml)
+        with open(tmpfile, "w") as f:
+            f.write(yaml)
 
     edit_file(tmpfile)
 
@@ -80,11 +84,17 @@ def edit(node_path):
             else:
                 print "ERROR:", json_decode(e.read())["error"]
             do_action = None
+        except yaml.scanner.ScannerError as e:
+            print "ERROR: %s" % e
+            do_action = do_edit
+            raw_input("Press enter to edit again ... ")
+            continue
         except:
-            raise
-        finally:
-            if os.path.exists(tmpfile):
-                os.unlink(tmpfile)
+	        if os.path.exists(tmpfile):
+		   	    os.unlink(tmpfile)
+        	raise
+	if os.path.exists(tmpfile):
+		os.unlink(tmpfile)
 
 if __name__ == '__main__':
     import sys
