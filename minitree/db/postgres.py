@@ -7,6 +7,7 @@ import re
 
 __all__ = ["dbBackend"]
 
+
 class HStoreSyntaxError(Exception):
     """Indicates an error unmarshalling an hstore value."""
     def __init__(self, hstore_str, pos):
@@ -87,7 +88,8 @@ last_modification timestamp default now())"
         return ', '.join('"%s"=>"%s"' % (esc(k, 'key'), esc(v, 'value'))
                          for k, v in val.iteritems())
 
-    def _splitPath(self, path):
+    @staticmethod
+    def _splitPath(path):
         parts = path.replace("/", ".").lstrip(".").split(".", 2)
 
         if len(parts) == 3:
@@ -100,9 +102,13 @@ last_modification timestamp default now())"
 
         return (schema, table, node_path)
 
+    def connect(self, *args, **kwargs):
+        assert(self.pool == None)
+        self.pool = adbapi.ConnectionPool("psycopg2", *args, **kwargs)
+
     def _selectPath(self, txn, path, sql):
         schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
+        tablename = self._buildTableName(schema, table)
         try:
             txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
@@ -119,10 +125,6 @@ last_modification timestamp default now())"
                 raise NodeNotFound("collection not found")
             else:
                 raise
-
-    def connect(self, *args, **kwargs):
-        assert(self.pool == None)
-        self.pool = adbapi.ConnectionPool("psycopg2", *args, **kwargs)
 
     def getAncestors(self, path):
         return self.pool.runInteraction(self._selectPath, path,
@@ -155,7 +157,7 @@ last_modification timestamp default now())"
 
     def _selectNode(self, txn, path, sql):
         schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
+        tablename = self._buildTableName(schema, table)
         try:
             txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
@@ -183,8 +185,8 @@ last_modification timestamp default now())"
         if ncall > 3:
             raise NodeCreationError("internal error")
         schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
-        hstore_value = Postgres._serialize_hstore(content)
+        tablename = self._buildTableName(schema, table)
+        hstore_value = self._serialize_hstore(content)
         try:
             txn.execute(self.createSQL % tablename, [node_path, hstore_value])
             return txn._cursor.rowcount
@@ -210,7 +212,7 @@ last_modification timestamp default now())"
 
     def _deleteNode(self, txn, path, content, cascade=False):
         schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
+        tablename = self._buildTableName(schema, table)
         if content:
             hstore_key = content.keys()
             txn.execute(self.deleteSQL % tablename, [hstore_key, node_path])
@@ -234,8 +236,8 @@ last_modification timestamp default now())"
 
     def _updateNode(self, txn, path, content):
         schema, table, node_path = self._splitPath(path)
-        tablename = Postgres._buildTableName(schema, table)
-        hstore_value = Postgres._serialize_hstore(content)
+        tablename = self._buildTableName(schema, table)
+        hstore_value = self._serialize_hstore(content)
         try:
             txn.execute(self.updateSQL % tablename, [hstore_value, node_path])
             return txn._cursor.rowcount
