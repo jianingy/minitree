@@ -2,10 +2,12 @@
 # -*- python -*-
 
 import re
+import pymongo
 
 RE_VAR = re.compile("%{([a-zA-Z0-9._-]+)}")
 MINITREE_SERVER = "http://localhost:8000"
-DEBUG=True
+MONGO_SERVER = "localhost:27017"
+DEBUG = True
 
 def info(message): print message
 
@@ -41,10 +43,15 @@ def expand_var(pair, node):
     expaneded = RE_VAR.sub(lambda x: _match(x, node), value)
     return (key, expaneded)
 
+def connect_cache_server(server):
+    hostname, port = server.split(":", 2)
+    return pymongo.Connection(hostname, int(port))
+
 def build_cache(manifest_path):
     cache_path = "cache.manifest." + manifest_path.lstrip(".")
     manifest = tree_send(cache_path)
     target = manifest["__target__"]
+    cache_conn = connect_cache_server(MONGO_SERVER)
     fields = filter(lambda x: not(x.startswith("__")
                                   and x.endswith("__")), manifest.keys())
     nodes = tree_send(target, method="children")
@@ -53,12 +60,18 @@ def build_cache(manifest_path):
         node = tree_send(node_name)
         cache = dict(map(lambda x: expand_var(x, node),
                          map(lambda x: (x, manifest[x]), fields)))
-        write_cache(cache)
+        write_cache(cache_conn, node_name, cache)
 
-def write_cache(cache):
-    for k in cache:
-        print k, cache[k].encode("UTF-8")
+def write_cache(cache_conn, node_path, cache):
+    splits = node_path.split(".")
+    assert(len(splits) > 2)
+    dbname = "_".join(splits[0:2])
+    db = cache_conn[dbname]
+    coll = db[splits[2]]
+    cache["__node_path__"] = node_path
+    coll.update({"__node__path__": node_path}, {"$set": cache}, True)
 
 if __name__ == '__main__':
     import sys
     build_cache(sys.argv[1])
+
