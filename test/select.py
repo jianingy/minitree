@@ -44,6 +44,42 @@ class TestSelectFunctions(unittest.TestCase):
     def setUp(self):
         pass
 
+    def test_select_ancestors_normal(self):
+        ret = url_access(self.base
+                         + "/node/test/table/a/b?method=ancestors").read()
+        data = json_decode(ret)
+        self.assertEqual(data, ["", "a"])
+
+    def test_select_ancestors_nonexists(self):
+        code = 200
+        try:
+            url_access(self.base
+                         + "/node/test/table/a/b/x/y?method=ancestors").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_children_normal(self):
+        ret = url_access(self.base
+                         + "/node/test/table/a?method=children").read()
+        data = json_decode(ret)
+        self.assertEqual(data, ["a.b"])
+
+    def test_select_children_nonexists(self):
+        code = 200
+        try:
+            url_access(self.base
+                         + "/node/test/table/a/b/x/y?method=children").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
     def test_select_node_normal(self):
         ret = url_access(self.base + "/node/test/table/a/b").read()
         data = json_decode(ret)

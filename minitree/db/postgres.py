@@ -32,16 +32,18 @@ class HStoreSyntaxError(Exception):
 class Postgres(object):
 
     selectSQL = "SELECT key, value FROM each( \
-(SELECT node_value FROM %s WHERE node_path = %%s LIMIT 1))"
+(SELECT node_value FROM %s WHERE node_path = %%(node_path)s LIMIT 1))"
     selectOverrideSQL = "SELECT key, value FROM each( \
 (SELECT hstore_override(node_value order by node_path asc) AS node_value \
-FROM %s WHERE node_path @> %%s))"
+FROM %s WHERE node_path @> %%(node_path)s))"
     selectComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
-FROM %s WHERE node_path @> %%s"
+FROM %s WHERE node_path @> %%(node_path)s"
     selectAncestorSQL = "SELECT node_path, node_value FROM %s \
-WHERE node_path @> %%s ORDER BY node_path ASC"
+WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s \
+ORDER BY node_path ASC"
     selectChildrenSQL = "SELECT node_path, node_value FROM %s \
-WHERE node_path <@ %%s ORDER BY node_path ASC"
+WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s \
+ORDER BY node_path ASC"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
 last_modification = now() \
 WHERE node_path = %%s"
@@ -102,7 +104,7 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = Postgres._buildTableName(schema, table)
         try:
-            txn.execute(sql % tablename, [node_path])
+            txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
             if result:
                 return map(lambda x: x[0], result)
@@ -155,7 +157,7 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = Postgres._buildTableName(schema, table)
         try:
-            txn.execute(sql % tablename, [node_path])
+            txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
             if result:
                 return result
