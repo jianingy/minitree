@@ -90,6 +90,8 @@ class NodeService(Resource):
             d = dbBackend.getAncestors(node_path)
         elif method == 'children':
             d = dbBackend.getChildren(node_path)
+        elif method == 'descendants':
+            d = dbBackend.getDescendants(node_path)
         else:
             raise UnsupportedGetNodeMethod()
         return d

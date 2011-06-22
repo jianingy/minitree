@@ -43,6 +43,8 @@ FROM %s WHERE node_path @> %%(node_path)s"
 WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s \
 ORDER BY node_path ASC"
     selectChildrenSQL = "SELECT node_path, node_value FROM %s \
+WHERE node_path ~ %%(node_path)s ORDER BY node_path ASC"
+    selectDescentantsSQL = "SELECT node_path, node_value FROM %s \
 WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s \
 ORDER BY node_path ASC"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
@@ -139,8 +141,15 @@ last_modification timestamp default now())"
         return d
 
     def getChildren(self, path):
-        d = self.pool.runInteraction(self._selectPath, path,
+        d = self.pool.runInteraction(self._selectPath, "%s.*{1}" % path,
                                      self.selectChildrenSQL)
+        d.addCallback(self._patch_path_heading, path)
+
+        return d
+
+    def getDescendants(self, path):
+        d = self.pool.runInteraction(self._selectPath, path,
+                                     self.selectDescentantsSQL)
         d.addCallback(self._patch_path_heading, path)
 
         return d

@@ -34,6 +34,14 @@ class TestSelectFunctions(unittest.TestCase):
                    json_encode(dict(key1="value1-3", key2="value2-2",
                                     key3="value3")),
                    method="PUT").read()
+        url_access(cls.base + "/node/test/table/a/c",
+                   json_encode(dict(key1="value1-3", key2="value2-2",
+                                    key3="value3")),
+                   method="PUT").read()
+        url_access(cls.base + "/node/test/table/a/c/d",
+                   json_encode(dict(key1="value1-3", key2="value2-2",
+                                    key3="value3")),
+                   method="PUT").read()
 
     @classmethod
     def tearDownClass(cls):
@@ -66,13 +74,34 @@ class TestSelectFunctions(unittest.TestCase):
         ret = url_access(self.base
                          + "/node/test/table/a?method=children").read()
         data = json_decode(ret)
-        self.assertEqual(data, ["test.table.a.b"])
+        self.assertEqual(data, ["test.table.a.b", "test.table.a.c"])
 
     def test_select_children_nonexists(self):
         code = 200
         try:
             url_access(self.base
                          + "/node/test/table/a/b/x/y?method=children").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
+
+        self.assertEqual(code, 404)
+        self.assertTrue("error" in ret)
+
+    def test_select_descendants_normal(self):
+        ret = url_access(self.base
+                         + "/node/test/table/a?method=descendants").read()
+        data = json_decode(ret)
+        self.assertEqual(data,
+                         ['test.table.a.b',
+                          'test.table.a.c',
+                          'test.table.a.c.d'])
+
+    def test_select_descendants_nonexists(self):
+        code = 200
+        try:
+            url_access(self.base
+                         + "/node/test/table/a/x?method=descendants").read()
         except urllib2.HTTPError as e:
             code = e.code
             ret = e.read()
