@@ -62,6 +62,8 @@ class NodeService(Resource):
         # content must be first argument
 
         def _success(rowcount):
+            if not rowcount:
+                rowcount = 0
             return dict(success="%d node(s) has been created" % rowcount,
                         affected=rowcount)
 
