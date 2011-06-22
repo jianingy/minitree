@@ -21,7 +21,7 @@ FROM %s WHERE node_path @> %%(node_path)s))"
 FROM %s WHERE node_path @> %%(node_path)s"
     selectAncestorSQL = "SELECT node_path FROM %s \
 WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s"
-    selectAllSQL = "SELECT node_path FROM %s WHERE node_path != %%(node_path)s"
+    selectAllSQL = "SELECT node_path FROM %s WHERE node_path ~ %%(q)s"
     selectDescentantsSQL = "SELECT node_path, node_value FROM %s \
 WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s"
     selectTablesSQL = "SELECT (schemaname || '.' || tablename) AS node_path \
@@ -135,7 +135,7 @@ last_modification timestamp default now())"
         elif n == 2:
             d = self.pool.runInteraction(self._selectPath,
                                          ".".join(p),
-                                         self.selectAllSQL, q="")
+                                         self.selectAllSQL, q="*{1}")
             d.addCallback(self._patch_path_heading, path)
         else:
             d = self.pool.runInteraction(self._selectPath,

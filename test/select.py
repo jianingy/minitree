@@ -85,9 +85,6 @@ class TestSelectFunctions(unittest.TestCase):
         data = json_decode(ret)
         self.assertEqual(data,
             ['test.table.a',
-            'test.table.a.b',
-            'test.table.a.c',
-            'test.table.a.c.d',
             'test.table.empty']
         )
 
