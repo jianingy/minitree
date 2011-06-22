@@ -34,7 +34,7 @@ class TestCreateFunctions(unittest.TestCase):
     def test_create_retval_success(self):
         data = dict(key_a="value_a", key_b="\"H\"'E'%l%@l@(e)")
         data[u"中文键"] = u"中文值"
-        ret = url_access(self.base + "/node/test/table/retval/success",
+        ret = url_access(self.base + "/node/test/table/success",
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
@@ -42,7 +42,7 @@ class TestCreateFunctions(unittest.TestCase):
         data = "Invalid Data"
         code = 200
         try:
-            url_access(self.base + "/node/test/table/retval/invalid/data",
+            url_access(self.base + "/node/test/table/invalid1",
                        data, "PUT").read()
         except urllib2.HTTPError as e:
             code = e.code
@@ -54,7 +54,7 @@ class TestCreateFunctions(unittest.TestCase):
     def test_create_retval_trailing(self):
         data = dict(key_a="value_a")
         data[u"中文键"] = u"中文值"
-        ret = url_access(self.base + "/node/test/table/retval/trailing/",
+        ret = url_access(self.base + "/node/test/table/trailing",
                          json_encode(data), "PUT").read()
         self.assertTrue("success" in ret)
 
@@ -64,7 +64,7 @@ class TestCreateFunctions(unittest.TestCase):
         data[u"中文键"] = u"中文值"
         code = 200
         try:
-            ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
+            ret = url_access(self.base + "/node/test/table/wrong_type1",
                              json_encode(data), "PUT").read()
         except urllib2.HTTPError as e:
             code = e.code
@@ -77,7 +77,7 @@ class TestCreateFunctions(unittest.TestCase):
         data[u"中文键"] = u"中文值"
         code = 200
         try:
-            ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
+            ret = url_access(self.base + "/node/test/table/wrong_type2",
                              json_encode(data), "PUT").read()
         except urllib2.HTTPError as e:
             code = e.code
@@ -88,26 +88,26 @@ class TestCreateFunctions(unittest.TestCase):
         code = 200
         data = dict(key_a="value_a")
         data[u"中文键"] = u"中文值"
-        url_access(self.base + "/node/test/table/retval/dup",
+        url_access(self.base + "/node/test/table/dup",
                    json_encode(data), "PUT")
         try:
-            ret = url_access(self.base + "/node/test/table/retval/dup",
+            ret = url_access(self.base + "/node/test/table/dup",
                              json_encode(data), "PUT").read()
         except urllib2.HTTPError as e:
             code = e.code
             ret = e.read()
 
         self.assertEqual(code, 400)
-        self.assertTrue(ret.find("retval.dup") > -1)
+        self.assertTrue(ret.find("dup") > -1)
         self.assertTrue(ret.find("already exists") > -1)
 
     def test_create_dbval(self):
         cursor = self.conn.cursor()
         data = dict(key_a="value_a")
         data[u"中文键"] = u"中文值"
-        url_access(self.base + "/node/test/table/dbval/a/b/c",
+        url_access(self.base + "/node/test/table/dbval",
                    json_encode(data), method="PUT").read()
         cursor.execute("SELECT node_value FROM test.table \
-WHERE node_path='dbval.a.b.c' LIMIT 1")
+WHERE node_path='dbval' LIMIT 1")
         data = cursor.fetchall()
         self.assertEqual(data[0][0], '"key_a"=>"value_a", "中文键"=>"中文值"')

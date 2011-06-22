@@ -5,6 +5,10 @@ class PathError(Exception):
     pass
 
 
+class ParentNotFound(Exception):
+    pass
+
+
 class NodeNotFound(Exception):
     pass
 

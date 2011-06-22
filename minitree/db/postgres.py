@@ -1,8 +1,9 @@
 from twisted.enterprise import adbapi
 from minitree.db import PathError, NodeNotFound, NodeCreationError
-from minitree.db import DataTypeError
+from minitree.db import DataTypeError, ParentNotFound
 from minitree.db import PathDuplicatedError
 from collections import defaultdict
+from os.path import splitext
 import psycopg2
 import re
 
@@ -220,6 +221,11 @@ last_modification timestamp default now())"
         tablename = self._buildTableName(schema, table)
         hstore_value = self._serialize_hstore(content)
         try:
+            parent_path, rest = splitext(node_path)
+            if rest:
+                txn.execute(self.selectOneSQL % tablename, dict(node_path=parent_path))
+                if not txn.fetchall():
+                    raise ParentNotFound()
             txn.execute(self.createSQL % tablename, [node_path, hstore_value])
             return txn._cursor.rowcount
         except psycopg2.IntegrityError as e:
