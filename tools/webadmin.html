@@ -19,6 +19,7 @@ html, body {
   height: 100%%;
   position: relative;
   font-size: 90%%;
+  font-family: "Mono";
 }
 div#wrapper {
   position:fixed;
@@ -88,20 +89,15 @@ $("#tree").jstree({
     "ajax": {
       "url": "/children/app/opsfree",
       "data": function(n) {
-        if (n.state == '') {
-          alert(n.state);
-          return {
-           "operation": "get_info",
-           "id": n.attr?n.attr("id"):"%(ns)s"
-          }
-        } else {
           return {
            "operation": "get_children",
            "id": n.attr?n.attr("id"):"%(ns)s"
           }
-        }
       }
-    }
+    },
+  },
+  "core": {
+    "animation": 0
   }
 })
 .bind("select_node.jstree", function(event, data) {
