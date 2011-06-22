@@ -26,15 +26,17 @@ div#left {
   float: left;
   width: 280px;
   height: 100%%;
-  background-color: #ccc;
-  overflow: scroll;
+  background-color: #ddd;
+  overflow: auto;
 }
 div#tree {
   background-color: transparent !important;
   margin: .75em 2.25em .25em 0;
 }
-div#content {
+div#right {
   float: left;
+}
+div#content {
   padding: 2.5em;
   line-height: 1.5em;
 }
@@ -44,13 +46,12 @@ div#content div#title {
 div#content div#value {
   margin-top: 2.25em;
 }
-div#content div#value b {
+div#value b {
   display: inline-block;
-  width: 8.5em;
+  width: 12.5em;
 }
-div#left div#footer {
+div#right div#footer {
   position: absolute;
-  text-align: center;
   bottom: 0;
   font-size: 90%%;
 }
@@ -65,13 +66,15 @@ div#left div#footer {
 <div id="wrapper">
   <div id="left">
     <div id="tree"></div>
+  </div>
+  <div id="right">
+    <div id="content">
+		<div id="title"></div>
+		<div id="value"></div>
+	</div>
     <div id="footer">
       MiniTree WebAdmin &copy; Jianing Yang 2011.
     </div>
-  </div>
-  <div id="content">
-    <div id="title"></div>
-    <div id="value"></div>
   </div>
 </div>
 <script type="text/javascript">
