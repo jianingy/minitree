@@ -42,6 +42,9 @@ class TestSelectFunctions(unittest.TestCase):
                    json_encode(dict(key1="value1-3", key2="value2-2",
                                     key3="value3")),
                    method="PUT").read()
+        url_access(cls.base + "/node/test/table/empty",
+                   json_encode(dict()),
+                   method="PUT").read()
 
     @classmethod
     def tearDownClass(cls):
@@ -277,3 +280,12 @@ class TestSelectFunctions(unittest.TestCase):
 
         self.assertEqual(code, 400)
         self.assertTrue("error" in ret)
+
+    def test_select_table_empty_node(self):
+        try:
+            ret = url_access(self.base
+                             + "/node/invalid?method=combo").read()
+        except urllib2.HTTPError as e:
+            ret = e.read()
+        data = json_decode(ret)
+        self.assertEqual(len(data.keys()), 0)

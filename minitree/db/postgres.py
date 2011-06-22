@@ -1,33 +1,12 @@
 from twisted.enterprise import adbapi
-from minitree.db import InvalidPathError, NodeNotFound, NodeCreationError
+from minitree.db import PathError, NodeNotFound, NodeCreationError
+from minitree.db import DataTypeError
 from minitree.db import PathDuplicatedError
 from collections import defaultdict
 import psycopg2
 import re
 
 __all__ = ["dbBackend"]
-
-
-class HStoreSyntaxError(Exception):
-    """Indicates an error unmarshalling an hstore value."""
-    def __init__(self, hstore_str, pos):
-        self.hstore_str = hstore_str
-        self.pos = pos
-
-        CTX = 20
-        hslen = len(hstore_str)
-
-        parsed_tail = hstore_str[max(pos - CTX - 1, 0):min(pos, hslen)]
-        residual = hstore_str[min(pos, hslen):min(pos + CTX + 1, hslen)]
-
-        if len(parsed_tail) > CTX:
-            parsed_tail = '[...]' + parsed_tail[1:]
-        if len(residual) > CTX:
-            residual = residual[:-1] + '[...]'
-
-        super(HStoreSyntaxError, self).__init__(
-                "After %r, could not parse residual at position %d: %r" %
-                (parsed_tail, pos, residual))
 
 
 class Postgres(object):
@@ -86,6 +65,10 @@ last_modification timestamp default now())"
         """
         def esc(s, position):
             try:
+                if isinstance(s, dict):
+                    raise DataTypeError("dict is not allowed")
+                elif isinstance(s, list):
+                    raise DataTypeError("list is not allowed")
                 return unicode(s).replace('"', r'\"').encode('UTF-8')
             except AttributeError:
                 raise ValueError("%r in %s position is not a string." %
@@ -103,7 +86,7 @@ last_modification timestamp default now())"
             schema, table = parts
             node_path = ""
         else:
-            raise InvalidPathError("Not enough level")
+            raise PathError("Not enough level")
 
         return (schema, table, node_path)
 
@@ -199,6 +182,7 @@ last_modification timestamp default now())"
         try:
             txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
+            print result
             if result:
                 return result
             else:

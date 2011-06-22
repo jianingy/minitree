@@ -1,7 +1,7 @@
 __all__ = ['InvalidPathError']
 
 
-class InvalidPathError(Exception):
+class PathError(Exception):
     pass
 
 
@@ -14,4 +14,8 @@ class NodeCreationError(Exception):
 
 
 class PathDuplicatedError(Exception):
+    pass
+
+
+class DataTypeError(Exception):
     pass

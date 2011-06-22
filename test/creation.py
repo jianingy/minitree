@@ -23,12 +23,6 @@ class TestCreateFunctions(unittest.TestCase):
         cls.base = os.environ["MINITREE_SERVER"]
         cls.conn = psycopg2.connect(os.environ["MINITREE_DSN"])
 
-    @classmethod
-    def tearDownClass(cls):
-        cursor = cls.conn.cursor()
-        cursor.execute("DROP SCHEMA test CASCADE")
-        cls.conn.commit()
-
     def setUp(self):
         cursor = self.conn.cursor()
         try:
@@ -68,16 +62,26 @@ class TestCreateFunctions(unittest.TestCase):
         """dict value should not be acceptable"""
         data = dict(key_a=dict(key_a=1))
         data[u"中文键"] = u"中文值"
-        ret = url_access(self.base + "/node/test/table/retval/wrong/type/1",
-                         json_encode(data), "PUT").read()
+        code = 200
+        try:
+            ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
+                             json_encode(data), "PUT").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
         self.assertTrue("error" in ret)
 
     def test_create_retval_wrong_type_2(self):
         """list value should not be acceptable"""
         data = dict(key_a=[1, 2])
         data[u"中文键"] = u"中文值"
-        ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
-                         json_encode(data), "PUT").read()
+        code = 200
+        try:
+            ret = url_access(self.base + "/node/test/table/retval/wrong/type/2",
+                             json_encode(data), "PUT").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret = e.read()
         self.assertTrue("error" in ret)
 
     def test_create_retval_dup(self):
