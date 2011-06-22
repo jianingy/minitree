@@ -3,6 +3,7 @@
 
 import re
 import pymongo
+from urllib import urlencode
 
 RE_VAR = re.compile("%{([a-zA-Z0-9._-]+)}")
 MINITREE_SERVER = "http://localhost:8000"
@@ -11,6 +12,17 @@ DEBUG = True
 
 def info(message): print message
 def warn(message): print message
+
+def tree_query(node_path):
+    import urllib2
+    from cjson import decode as json_decode
+    ns, coll, q = node_path.split(".", 2)
+    url = MINITREE_SERVER.rstrip("/") + "/node/" + ns + "/" + coll + '?'
+    param = urlencode(dict(q=q))
+    url = url + param
+    ret = urllib2.urlopen(url)
+    json = ret.read()
+    return json_decode(json)
 
 def tree_send(node_path, data="", method="", mode="r"):
     import urllib2
@@ -22,7 +34,8 @@ def tree_send(node_path, data="", method="", mode="r"):
     opener = urllib2.build_opener(urllib2.HTTPHandler)
     request = urllib2.Request(url, data)
     request.get_method = lambda: modemap[mode]
-    return json_decode(opener.open(request).read())
+    json = opener.open(request).read()
+    return json_decode(json)
 
 def _expand_var(v, node):
     if v[0] in node:
@@ -55,7 +68,7 @@ def build_cache(manifest_path):
     cache_conn = connect_cache_server(MONGO_SERVER)
     fields = filter(lambda x: not(x.startswith("__")
                                   and x.endswith("__")), manifest.keys())
-    nodes = tree_send(target, method="children")
+    nodes = tree_query(target)
     for node_name in nodes:
         info("rebuilding `%s' ..." % node_name)
         node = tree_send(node_name)
