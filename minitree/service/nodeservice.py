@@ -96,6 +96,10 @@ class NodeService(Resource):
             raise UnsupportedGetNodeMethod()
         return d
 
+    def searchNode(self, node_path, q):
+        d = dbBackend.searchNode(node_path, q)
+        return d
+
     def selectNode(self, node_path):
         d = dbBackend.selectNode(node_path)
         return d
@@ -165,7 +169,9 @@ class NodeService(Resource):
 
     def render_GET(self, request):
         node_path, format = NodeService._buildQuery(request)
-        if "method" in request.args:
+        if "q" in request.args:
+            d = self.searchNode(node_path, request.args["q"][0])
+        elif "method" in request.args:
             method = request.args["method"][0].lower()
             d = self.getNode(node_path, method)
         else:

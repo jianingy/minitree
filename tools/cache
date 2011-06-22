@@ -10,6 +10,7 @@ MONGO_SERVER = "localhost:27017"
 DEBUG = True
 
 def info(message): print message
+def warn(message): print message
 
 def tree_send(node_path, data="", method="", mode="r"):
     import urllib2
@@ -31,7 +32,7 @@ def _expand_var(v, node):
         else:
             return node[v[0]]
     else:
-        warn("`%s' not exists in node `%s'" % (v[0], reprt(node)))
+        warn("`%s' not exists in node `%s'" % (v, repr(node)))
 
 def expand_var(pair, node):
 

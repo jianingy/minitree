@@ -39,16 +39,17 @@ class Postgres(object):
 FROM %s WHERE node_path @> %%(node_path)s))"
     selectComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
 FROM %s WHERE node_path @> %%(node_path)s"
-    selectAncestorSQL = "SELECT node_path, node_value FROM %s \
+    selectAncestorSQL = "SELECT node_path FROM %s \
 WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s \
 ORDER BY node_path ASC"
-    selectChildrenSQL = "SELECT node_path, node_value FROM %s \
+    selectChildrenSQL = "SELECT node_path FROM %s \
 WHERE node_path ~ %%(node_path)s ORDER BY node_path ASC"
     selectDescentantsSQL = "SELECT node_path, node_value FROM %s \
 WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s \
 ORDER BY node_path ASC"
     selectTablesSQL = "SELECT (schemaname || '.' || tablename) AS node_path \
 FROM pg_tables WHERE schemaname=%(name)s;"
+    searchNodeSQL = "SELECT node_path FROM %s WHERE node_path ~ %%(q)s"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
 last_modification = now() \
 WHERE node_path = %%s"
@@ -110,11 +111,14 @@ last_modification timestamp default now())"
         assert(self.pool == None)
         self.pool = adbapi.ConnectionPool("psycopg2", *args, **kwargs)
 
-    def _selectPath(self, txn, path, sql):
+    def _selectPath(self, txn, path, sql, q=None):
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
-            txn.execute(sql % tablename, dict(node_path=node_path))
+            if q:
+                txn.execute(sql % tablename, dict(q=q))
+            else:
+                txn.execute(sql % tablename, dict(node_path=node_path))
             result = txn.fetchall()
             if result:
                 return map(lambda x: x[0], result)
@@ -213,6 +217,14 @@ last_modification timestamp default now())"
         d = self.pool.runInteraction(self._selectNode, path, self.selectSQL)
         d.addCallback(lambda r: dict(map(lambda x: (x[0].decode("UTF-8"),
                                                     x[1].decode("UTF-8")), r)))
+        return d
+
+    def searchNode(self, path, q):
+        prefix = path.lstrip("/").replace("/", ".") + "."
+        d = self.pool.runInteraction(self._selectPath, path,
+                                     self.searchNodeSQL, q)
+        d.addCallback(lambda r: map(lambda x: prefix + x, r))
+
         return d
 
     def _createNode(self, txn, path, content, ncall=0):
