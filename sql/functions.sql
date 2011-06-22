@@ -13,9 +13,3 @@ CREATE AGGREGATE hstore_override(
   initcond = ''
 );
 
-
--- HSTORE COMBO
-CREATE OR REPLACE FUNCTION hstore_merge(hstore, hstore)
-RETURNS hstore
-AS 'SELECT $1 || $2'
-LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;

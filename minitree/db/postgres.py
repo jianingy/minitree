@@ -11,6 +11,7 @@ __all__ = ["dbBackend"]
 
 class Postgres(object):
 
+    selectOneSQL = "SELECT 1 FROM %s WHERE node_path = %%(node_path)s LIMIT 1"
     selectSQL = "SELECT key, value FROM each( \
 (SELECT node_value FROM %s WHERE node_path = %%(node_path)s LIMIT 1))"
     selectOverrideSQL = "SELECT key, value FROM each( \
@@ -19,13 +20,10 @@ FROM %s WHERE node_path @> %%(node_path)s))"
     selectComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
 FROM %s WHERE node_path @> %%(node_path)s"
     selectAncestorSQL = "SELECT node_path FROM %s \
-WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s \
-ORDER BY node_path ASC"
-    selectChildrenSQL = "SELECT node_path FROM %s \
-WHERE node_path ~ %%(node_path)s ORDER BY node_path ASC"
+WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s"
+    selectAllSQL = "SELECT node_path FROM %s WHERE node_path != %%(node_path)s"
     selectDescentantsSQL = "SELECT node_path, node_value FROM %s \
-WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s \
-ORDER BY node_path ASC"
+WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s"
     selectTablesSQL = "SELECT (schemaname || '.' || tablename) AS node_path \
 FROM pg_tables WHERE schemaname=%(name)s;"
     searchNodeSQL = "SELECT node_path FROM %s WHERE node_path ~ %%(q)s"
@@ -98,15 +96,14 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
+            txn.execute(self.selectOneSQL % tablename, dict(node_path=node_path))
+            if not txn.fetchall():
+                raise NodeNotFound()
             if q:
                 txn.execute(sql % tablename, dict(q=q))
             else:
                 txn.execute(sql % tablename, dict(node_path=node_path))
-            result = txn.fetchall()
-            if result:
-                return map(lambda x: x[0], result)
-            else:
-                raise NodeNotFound()
+            return map(lambda x: x[0], txn.fetchall())
         except psycopg2.ProgrammingError as e:
             err = unicode(e)
             txn.execute("ROLLBACK")
@@ -130,14 +127,21 @@ last_modification timestamp default now())"
         return d
 
     def getChildren(self, path):
-        p = path.lstrip("/").replace("/", ".").split(".")
+        p = path.lstrip("/").split("/")
         n = len(p)
         if n == 1:
             d = self.pool.runInteraction(self._selectDBObject, p[0],
                                          self.selectTablesSQL)
+        elif n == 2:
+            d = self.pool.runInteraction(self._selectPath,
+                                         ".".join(p),
+                                         self.selectAllSQL, q="")
+            d.addCallback(self._patch_path_heading, path)
         else:
-            d = self.pool.runInteraction(self._selectPath, "%s.*{1}" % path,
-                                         self.selectChildrenSQL)
+            d = self.pool.runInteraction(self._selectPath,
+                                         ".".join(p),
+                                         self.searchNodeSQL,
+                                         q="%s.*{1}" % ".".join(p[2:]))
             d.addCallback(self._patch_path_heading, path)
         return d
 
@@ -180,13 +184,11 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
-            txn.execute(sql % tablename, dict(node_path=node_path))
-            result = txn.fetchall()
-            print result
-            if result:
-                return result
-            else:
+            txn.execute(self.selectOneSQL % tablename, dict(node_path=node_path))
+            if not txn.fetchall():
                 raise NodeNotFound()
+            txn.execute(sql % tablename, dict(node_path=node_path))
+            return txn.fetchall()
         except psycopg2.ProgrammingError as e:
             err = unicode(e)
             txn.execute("ROLLBACK")

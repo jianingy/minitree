@@ -79,6 +79,18 @@ class TestSelectFunctions(unittest.TestCase):
         data = json_decode(ret)
         self.assertEqual(data, ["test.table.a.b", "test.table.a.c"])
 
+    def test_select_children_collection(self):
+        ret = url_access(self.base
+                         + "/node/test/table?method=children").read()
+        data = json_decode(ret)
+        self.assertEqual(data,
+            ['test.table.a',
+            'test.table.a.b',
+            'test.table.a.c',
+            'test.table.a.c.d',
+            'test.table.empty']
+        )
+
     def test_select_children_nonexists(self):
         code = 200
         try:
@@ -284,7 +296,7 @@ class TestSelectFunctions(unittest.TestCase):
     def test_select_table_empty_node(self):
         try:
             ret = url_access(self.base
-                             + "/node/invalid?method=combo").read()
+                             + "/node/test/table/empty").read()
         except urllib2.HTTPError as e:
             ret = e.read()
         data = json_decode(ret)
