@@ -47,6 +47,8 @@ WHERE node_path ~ %%(node_path)s ORDER BY node_path ASC"
     selectDescentantsSQL = "SELECT node_path, node_value FROM %s \
 WHERE node_path <@ %%(node_path)s AND node_path != %%(node_path)s \
 ORDER BY node_path ASC"
+    selectTablesSQL = "SELECT (schemaname || '.' || tablename) AS node_path \
+FROM pg_tables WHERE schemaname=%(name)s;"
     updateSQL = "UPDATE %s SET node_value = node_value || %%s, \
 last_modification = now() \
 WHERE node_path = %%s"
@@ -141,10 +143,16 @@ last_modification timestamp default now())"
         return d
 
     def getChildren(self, path):
-        d = self.pool.runInteraction(self._selectPath, "%s.*{1}" % path,
-                                     self.selectChildrenSQL)
-        d.addCallback(self._patch_path_heading, path)
-
+        p = path.lstrip("/").replace("/", ".").split(".")
+        n = len(p)
+        print p, n
+        if n == 1:
+            d = self.pool.runInteraction(self._selectDBObject, p[0],
+                                         self.selectTablesSQL)
+        else:
+            d = self.pool.runInteraction(self._selectPath, "%s.*{1}" % path,
+                                         self.selectChildrenSQL)
+            d.addCallback(self._patch_path_heading, path)
         return d
 
     def getDescendants(self, path):
@@ -174,6 +182,14 @@ last_modification timestamp default now())"
         d.addCallback(_combo)
 
         return d
+
+    def _selectDBObject(self, txn, name, sql):
+        txn.execute(sql, dict(name=name))
+        result = txn.fetchall()
+        if result:
+            return map(lambda x: x[0], result)
+        else:
+            raise NodeNotFound()
 
     def _selectNode(self, txn, path, sql):
         schema, table, node_path = self._splitPath(path)
