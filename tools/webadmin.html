@@ -1,0 +1,116 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>MiniTree - namespace - %(ns)s</title>
+<!--
+<link rel="stylesheet" type="text/css" href="http://static.jstree.com/v.1.0pre/_docs/!style.css" />
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script> 
+<script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.cookie.js"></script>
+<script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.hotkeys.js"></script>
+<script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.jstree.js"></script>
+-->
+<link rel="stylesheet" type="text/css" href="http://shake/!style.css" />
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: 100%%;
+  height: 100%%;
+  position: relative;
+  font-size: 90%%;
+}
+div#wrapper {
+  position:fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%%;
+  widht: 100%%;
+}
+div#left {
+  float: left;
+  width: 280px;
+  height: 100%%;
+  background-color: #ccc;
+}
+div#tree {
+  background-color: transparent !important;
+  margin: .75em 2.25em .25em 0;
+}
+div#content {
+  float: left;
+  padding: 2.5em;
+  line-height: 1.5em;
+}
+div#content div#title {
+  font-size: x-large;
+}
+div#content div#value {
+  margin-top: 2.25em;
+}
+div#content div#value b {
+  display: inline-block;
+  width: 8.5em;
+}
+</style>
+<script type="text/javascript" src="http://shake/jquery.min.js"></script> 
+<script type="text/javascript" src="http://shake/jquery.cookie.js"></script>
+<script type="text/javascript" src="http://shake/jquery.hotkeys.js"></script>
+<script type="text/javascript" src="http://shake/jquery.jstree.js"></script>
+</head>
+<body>
+<div id="wrapper">
+  <div id="left">
+    <div id="tree"></div>
+  </div>
+  <div id="content">
+    <div id="title"></div>
+    <div id="value"></div>
+  </div>
+</div>
+<script type="text/javascript">
+$(document).ready(function() {
+
+$("#tree").jstree({
+  "plugins": [ "themes", "json_data", "ui" ],
+  "json_data": {
+    "ajax": {
+      "url": "/children/app/opsfree",
+      "data": function(n) {
+        if (n.state == '') {
+          alert(n.state);
+          return {
+           "operation": "get_info",
+           "id": n.attr?n.attr("id"):"%(ns)s"
+          }
+        } else {
+          return {
+           "operation": "get_children",
+           "id": n.attr?n.attr("id"):"%(ns)s"
+          }
+        }
+      }
+    }
+  }
+})
+.bind("select_node.jstree", function(event, data) {
+api = "/node?id=" + data.rslt.obj.attr("id")
+$.ajax({
+  url: api,
+  dataType: "json",
+  success: (function(path) { return function(data) {
+    s = "";
+    for (name in data)
+      s += "<div class=\"item\"><b>" + name + "</b><span>" + data[name] + "</span></div>";
+    $("#value").html(s);
+    $("#title").html(path);
+  }})(data.rslt.obj.attr("id"))
+});
+})
+.delegate("a", "click", function (event, data) { event.preventDefault(); });
+});
+</script>
+</body>
+</html>

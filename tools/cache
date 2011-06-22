@@ -69,7 +69,7 @@ def write_cache(cache_conn, node_path, cache):
     db = cache_conn[dbname]
     coll = db[splits[2]]
     cache["__node_path__"] = node_path
-    coll.update({"__node__path__": node_path}, {"$set": cache}, True)
+    coll.update({"__node_path__": node_path}, {"$set": cache}, True)
 
 if __name__ == '__main__':
     import sys

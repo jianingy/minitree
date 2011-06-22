@@ -1,0 +1,118 @@
+#!/usr/bin/env python
+# -*- python -*-
+# -*- coding: utf-8 -*-
+
+from twisted.internet import epollreactor
+epollreactor.install()
+from twisted.web.resource import Resource
+from twisted.internet.defer import DeferredList
+from twisted.web.server import NOT_DONE_YET
+from twisted.web import client
+from cjson import encode as json_encode, decode as json_decode
+import logging
+import sys
+
+MINITREE_SERVER = "http://localhost:8000"
+
+class WebAdmin(Resource):
+
+    isLeaf = True
+
+    def __init__(self, content):
+        with open(content) as f:
+            self.content = f.read()
+
+    def render_GET(self, request):
+        if "ns" not in request.args:
+            return "No NS found!"
+        ns = request.args["ns"][0]
+        return self.content % dict(ns=ns)
+
+class Node(Resource):
+
+    isLeaf = True
+
+    def got_value(self, data):
+        return data
+
+    def finish(self, data, request):
+        request.write(data)
+        request.finish()
+
+    def render_GET(self, request):
+        id = request.args["id"][0]
+        url = MINITREE_SERVER.rstrip("/") + "/node/" + id.replace(".", "/")
+        d = client.getPage(url, followRedirect=True)
+        d.addCallback(self.got_value)
+        d.addCallback(self.finish, request)
+        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        return NOT_DONE_YET
+
+
+class Children(Resource):
+
+    isLeaf = True
+
+    def got_children(self, data):
+
+        def _build(x):
+            splits = x.split(".")
+            return dict(data=splits[-1], state="closed", attr=dict(id=x))
+        data = json_decode(data)
+        return map(_build, data)
+
+    def check_descendants(self, data):
+        def _patch(err, data):
+            data["state"] = ""
+            print data
+            return data
+
+        def _check(data):
+            url = MINITREE_SERVER.rstrip("/") + "/node/"
+            url += data["attr"]["id"].replace(".", "/")
+            url += "?method=children"
+            d = client.getPage(url, followRedirect=True)
+            d.addCallback(lambda x: data)
+            d.addErrback(_patch, data)
+            return d
+
+        dl = DeferredList(map(_check, data), consumeErrors=True)
+        dl.addCallback(lambda x: map(lambda y: y[1], filter(lambda z: z[0], x)))
+        return dl
+
+    def finish(self, data, request):
+        print "*", data
+        request.write(json_encode(data))
+        request.finish()
+
+    def render_GET(self, request):
+        id = request.args["id"][0]
+        url = MINITREE_SERVER.rstrip("/") + "/node/" + id.replace(".", "/")
+        url += "?method=children"
+        d = client.getPage(url, followRedirect=True)
+        d.addCallback(self.got_children)
+        d.addCallback(self.check_descendants)
+        d.addCallback(self.finish, request)
+        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        return NOT_DONE_YET
+
+def main(c):
+    from twisted.python import log
+    from twisted.web import server
+
+    observer = log.PythonLoggingObserver()
+    observer.start()
+    logging.basicConfig(file=sys.stderr, level=logging.DEBUG)
+    admin = WebAdmin("webadmin.html")
+    root = Resource()
+    root.putChild("admin", admin)
+    root.putChild("children", Children())
+    root.putChild("node", Node())
+    site = server.Site(root)
+
+    from twisted.internet import reactor
+    reactor.listenTCP(9000, site)
+    reactor.run()
+
+if __name__ == '__main__':
+    main(None)
