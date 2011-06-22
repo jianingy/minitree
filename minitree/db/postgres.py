@@ -145,7 +145,6 @@ last_modification timestamp default now())"
     def getChildren(self, path):
         p = path.lstrip("/").replace("/", ".").split(".")
         n = len(p)
-        print p, n
         if n == 1:
             d = self.pool.runInteraction(self._selectDBObject, p[0],
                                          self.selectTablesSQL)
@@ -174,7 +173,6 @@ last_modification timestamp default now())"
         def _combo(result):
             combo = defaultdict(list)
             map(lambda x: combo[x[0]].append(x[1].decode("UTF-8")), result)
-            print combo
             return combo
 
         d = self.pool.runInteraction(self._selectNode, path,
