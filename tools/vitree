@@ -12,10 +12,13 @@ node_server = "http://localhost:8000"
 
 def urlopen(url, data="", method="GET"):
     import urllib2
-    opener = urllib2.build_opener(urllib2.HTTPHandler)
-    request = urllib2.Request(url, data)
-    request.get_method = lambda: method
-    return opener.open(request)
+	try:
+		opener = urllib2.build_opener(urllib2.HTTPHandler)
+		request = urllib2.Request(url, data)
+		request.get_method = lambda: method
+		return opener.open(request)
+	except urllib2.HTTPError as e:
+		raise
 
 def edit_file(tmpfile):
     editor = os.environ["EDITOR"]

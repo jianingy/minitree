@@ -115,10 +115,10 @@ class NodeService(Resource):
             error = dict(error="unknown error occurred")
             if isinstance(err, minitree.db.NodeNotFound):
                 request.setResponseCode(404)
-                error = dict(error="parent node not found", message=err.message)
+                error = dict(error="node not found", message=err.message)
             elif isinstance(err, minitree.db.ParentNotFound):
                 request.setResponseCode(404)
-                error = dict(error="node not found", message=err.message)
+                error = dict(error="parent node not found", message=err.message)
             elif isinstance(err, minitree.db.PathDuplicatedError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
