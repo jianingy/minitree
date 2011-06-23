@@ -242,7 +242,7 @@ last_modification timestamp default now())"
             if err.startswith("duplicate key value violates"):
                 raise PathDuplicatedError("%s already exists" % node_path)
         except psycopg2.ProgrammingError as e:
-            err = unicode(e)
+            err = str(e)
             if self.regexNoSchema.match(err):
                 txn.execute("ROLLBACK")
                 txn.execute(self.createSchemaSQL % schema)
