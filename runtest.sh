@@ -1,6 +1,7 @@
 #!/bin/bash
 export MINITREE_SERVER="http://127.0.0.1:8000"
-export MINITREE_DSN="host=localhost port=5432 user=jianingy"
+export MINITREE_DSN="host=localhost port=5432 user=postgres dbname=minitree"
 
 cd $(dirname $0)
-exec python -m unittest test
+python test/select.py
+python test/creation.py
