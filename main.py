@@ -7,30 +7,6 @@ import logging
 import sys
 
 
-def configure(ini_file):
-    from ConfigParser import SafeConfigParser as ConfigParser
-    import codecs
-    from StringIO import StringIO
-
-    default = """
-[server:main]
-port = 8000
-admin_user =
-admin_pass =
-
-[backend:main]
-dsn = host=%(server)s port=%(port)s dbname=%(database)s \
-user=%(user)s password=%(password)s
-user =
-password =
-"""
-    p = ConfigParser()
-    p.readfp(StringIO(default))
-    with codecs.open(ini_file, "r", encoding="utf-8") as f:
-        p.readfp(f)
-    return p
-
-
 def main(c):
     from twisted.python import log
     from twisted.web import server
@@ -50,4 +26,5 @@ def main(c):
     reactor.run()
 
 if __name__ == '__main__':
+    from minitree import configure
     main(configure(sys.argv[1]))
