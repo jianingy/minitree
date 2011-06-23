@@ -1,4 +1,5 @@
 from twisted.internet.threads import deferToThread
+from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.python import log
@@ -53,10 +54,6 @@ class NodeService(Resource):
             format = NodeService.defaultFormat
 
         return node_path, format
-
-    def cancel(self, err, call):
-        log.msg("Request cancelled.")
-        call.cancel()
 
     def createNode(self, content, node_path):
         # content must be first argument
@@ -113,12 +110,16 @@ class NodeService(Resource):
             err = value.value
             request.setResponseCode(500)
             error = dict(error="unknown error occurred")
-            if isinstance(err, minitree.db.NodeNotFound):
+            if isinstance(err, defer.CancelledError):
+                log.msg("Request cancelled.", level=logging.DEBUG)
+                return None
+            elif isinstance(err, minitree.db.NodeNotFound):
                 request.setResponseCode(404)
                 error = dict(error="node not found", message=err.message)
             elif isinstance(err, minitree.db.ParentNotFound):
-                request.setResponseCode(404)
-                error = dict(error="parent node not found", message=err.message)
+                request.setResponseCode(400)
+                error = dict(error="parent node not found",
+                             message=err.message)
             elif isinstance(err, minitree.db.PathDuplicatedError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
@@ -161,6 +162,10 @@ class NodeService(Resource):
         self.startTime = time.time()
         return Resource.render(self, *args, **kwargs)
 
+    def cancel(self, err, call):
+        log.msg("Request cancelling.", level=logging.DEBUG)
+        call.cancel()
+
     def render_DELETE(self, request):
         node_path, format = NodeService._buildQuery(request)
         cascade = False
@@ -172,7 +177,7 @@ class NodeService(Resource):
         d = deferToThread(lambda x: json_decode(x or '""'), content.strip())
         d.addCallback(self.deleteNode, node_path, cascade)
         d.addBoth(self.finish, request, format)
-        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        request.notifyFinish().addErrback(self.cancel, d)
         return NOT_DONE_YET
 
     def render_GET(self, request):
@@ -185,7 +190,7 @@ class NodeService(Resource):
         else:
             d = self.selectNode(node_path)
         d.addBoth(self.finish, request, format)
-        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        request.notifyFinish().addErrback(self.cancel, d)
         return NOT_DONE_YET
 
     def render_POST(self, request):
@@ -195,7 +200,7 @@ class NodeService(Resource):
         d = deferToThread(lambda x: json_decode(x), content)
         d.addCallback(self.updateNode, node_path)
         d.addBoth(self.finish, request, format)
-        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        request.notifyFinish().addErrback(self.cancel, d)
         return NOT_DONE_YET
 
     def render_PUT(self, request):
@@ -205,5 +210,5 @@ class NodeService(Resource):
         d = deferToThread(lambda x: json_decode(x), content)
         d.addCallback(self.createNode, node_path)
         d.addBoth(self.finish, request, format)
-        request.notifyFinish().addErrback(lambda e, d: d.cancel(), d)
+        request.notifyFinish().addErrback(self.cancel, d)
         return NOT_DONE_YET

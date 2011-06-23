@@ -37,7 +37,7 @@ def main(c):
     observer.start()
     logging.basicConfig(file=sys.stderr, level=logging.DEBUG)
 
-    dbBackend.connect(c.get("backend:main", "dsn"))
+    dbBackend.connect(c.get("backend:main", "dsn"), cp_min=8, cp_max=16)
 
     from minitree.service import root as site_root
     site = server.Site(site_root)
