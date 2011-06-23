@@ -59,6 +59,7 @@ class Children(Resource):
         def _build(x):
             splits = x.split(".")
             return dict(data=splits[-1], state="closed", attr=dict(id=x))
+        print data
         data = json_decode(data)
         return map(_build, data)
 

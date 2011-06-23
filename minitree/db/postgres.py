@@ -77,7 +77,7 @@ last_modification timestamp default now())"
                          for k, v in val.iteritems())
 
     @staticmethod
-    def _splitPath(path):
+    def _splitPath(path, encode=True):
         parts = path.replace("/", ".").lstrip(".").split(".", 2)
 
         if len(parts) == 3:
@@ -88,9 +88,10 @@ last_modification timestamp default now())"
         else:
             raise PathError("Not enough level")
 
-        schema = schema.encode("UTF-8")
-        table = table.encode("UTF-8")
-        node_path = node_path.encode("UTF-8")
+        if encode:
+            schema = schema.encode("UTF-8")
+            table = table.encode("UTF-8")
+            node_path = node_path.encode("UTF-8")
 
         return (schema, table, node_path)
 
@@ -122,7 +123,7 @@ last_modification timestamp default now())"
                 raise
 
     def _patch_path_heading(self, value, path):
-        schema, table, node_path = self._splitPath(path)
+        schema, table, node_path = self._splitPath(path, False)
         prefix = "%s.%s" % (schema, table)
         return map(lambda x: ("%s.%s" % (prefix, x)).rstrip("."),
                    value)
@@ -137,6 +138,7 @@ last_modification timestamp default now())"
     def getChildren(self, path):
         p = path.lstrip("/").split("/")
         n = len(p)
+
         if n == 1:
             d = self.pool.runInteraction(self._selectDBObject, p[0],
                                          self.selectTablesSQL)
@@ -184,7 +186,7 @@ last_modification timestamp default now())"
         txn.execute(sql, dict(name=name))
         result = txn.fetchall()
         if result:
-            return map(lambda x: x[0], result)
+            return map(lambda x: x[0].decode("UTF-8"), result)
         else:
             raise NodeNotFound()
 
