@@ -97,7 +97,8 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
-            txn.execute(self.selectOneSQL % tablename, dict(node_path=node_path))
+            txn.execute(self.selectOneSQL % tablename,
+                        dict(node_path=node_path))
             if not txn.fetchall():
                 raise NodeNotFound()
             if q:
@@ -185,7 +186,8 @@ last_modification timestamp default now())"
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
-            txn.execute(self.selectOneSQL % tablename, dict(node_path=node_path))
+            txn.execute(self.selectOneSQL % tablename,
+                        dict(node_path=node_path))
             if not txn.fetchall():
                 raise NodeNotFound()
             txn.execute(sql % tablename, dict(node_path=node_path))
@@ -223,7 +225,8 @@ last_modification timestamp default now())"
         try:
             parent_path, rest = splitext(node_path)
             if rest:
-                txn.execute(self.selectOneSQL % tablename, dict(node_path=parent_path))
+                txn.execute(self.selectOneSQL % tablename,
+                            dict(node_path=parent_path))
                 if not txn.fetchall():
                     raise ParentNotFound()
             txn.execute(self.createSQL % tablename, [node_path, hstore_value])
