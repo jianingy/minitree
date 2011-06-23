@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from cjson import encode as json_encode
-import unittest
+import unittest2
 import psycopg2
 import urllib2
 import os
@@ -13,7 +13,7 @@ def url_access(url, data="", method="GET"):
     return opener.open(request)
 
 
-class TestCreateFunctions(unittest.TestCase):
+class TestCreateFunctions(unittest2.TestCase):
 
     base = None
     conn = None
@@ -111,3 +111,7 @@ class TestCreateFunctions(unittest.TestCase):
 WHERE node_path='dbval' LIMIT 1")
         data = cursor.fetchall()
         self.assertEqual(data[0][0], '"key_a"=>"value_a", "中文键"=>"中文值"')
+
+
+if __name__ == "__main__":
+    unittest2.main()

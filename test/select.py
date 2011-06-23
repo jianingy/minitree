@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from cjson import decode as json_decode, encode as json_encode
-import unittest
+import unittest2
 import psycopg2
 import urllib2
 import os
@@ -13,7 +13,7 @@ def url_access(url, data="", method="GET"):
     return opener.open(request)
 
 
-class TestSelectFunctions(unittest.TestCase):
+class TestSelectFunctions(unittest2.TestCase):
 
     base = None
     conn = None
@@ -298,3 +298,8 @@ class TestSelectFunctions(unittest.TestCase):
             ret = e.read()
         data = json_decode(ret)
         self.assertEqual(len(data.keys()), 0)
+
+if __name__ == "__main__":
+    unittest2.main()
+
+	
