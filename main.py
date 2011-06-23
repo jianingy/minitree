@@ -15,6 +15,8 @@ def configure(ini_file):
     default = """
 [server:main]
 port = 8000
+admin_user =
+admin_pass =
 
 [backend:main]
 dsn = host=%(server)s port=%(port)s dbname=%(database)s \
@@ -39,7 +41,8 @@ def main(c):
 
     dbBackend.connect(c.get("backend:main", "dsn"), cp_min=8, cp_max=16)
 
-    from minitree.service import root as site_root
+    from minitree.service import site_configure
+    site_root = site_configure(c)
     site = server.Site(site_root)
 
     from twisted.internet import reactor

@@ -4,6 +4,8 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.python import log
 from twisted.python.failure import Failure
+from hashlib import md5 as md5sum
+from collections import namedtuple
 from minitree.db.postgres import dbBackend
 from cjson import encode as json_encode, decode as json_decode
 import cjson
@@ -11,8 +13,14 @@ import time
 import minitree.db
 import logging
 
+INode = namedtuple("Inode", ["node_path", "format", "data", "user", "passwd"])
+
 
 class UnsupportedGetNodeMethod(Exception):
+    pass
+
+
+class ServiceAuthenticationError(Exception):
     pass
 
 
@@ -40,6 +48,12 @@ class NodeService(Resource):
     defaultFormat = "json"
     allowedFormat = ("json", "xml")
 
+    # privilege bits
+    X_GET    = 8
+    X_PUT    = 4
+    X_POST   = 2
+    X_DELETE = 1
+
     @staticmethod
     def _buildQuery(request):
         uri = request.path[len(NodeService.serviceName) + 1:].rstrip("/")
@@ -55,7 +69,37 @@ class NodeService(Resource):
 
         return node_path, format
 
-    def createNode(self, content, node_path):
+    def __init__(self, c, *args, **kwargs):
+        self.config = c
+        self.admin_user = self.config.get("server:main", "admin_user")
+        self.admin_passwd = self.config.get("server:main", "admin_pass")
+        Resource.__init__(self, *args, **kwargs)
+
+    def auth(self, inode, bits):
+
+        def _auth(user, inode):
+            if user["password"] != inode.passwd:
+                raise ServiceAuthenticationError()
+            return inode
+
+        def _fail(e):
+            log.msg("Authentication failed: %s" % str(e.value),
+                    level=logging.DEBUG)
+            raise ServiceAuthenticationError()
+
+        # if no admin_user, disable authentication
+        if self.admin_user == '':
+            return inode
+
+        # admin user has all privileges
+        if (inode.user == self.admin_user and
+            inode.passwd == self.admin_passwd):
+            return inode
+        d = dbBackend.selectNode("_meta.users." + inode.user)
+        d.addCallbacks(_auth, _fail, callbackArgs=(inode,))
+        return d
+
+    def createNode(self, inode):
         # content must be first argument
 
         def _success(rowcount):
@@ -64,23 +108,24 @@ class NodeService(Resource):
             return dict(success="%d node(s) has been created" % rowcount,
                         affected=rowcount)
 
-        if not isinstance(content, dict):
+        if not isinstance(inode.data, dict):
             raise InvalidInputData()
-        d = dbBackend.createNode(node_path, content)
+        d = dbBackend.createNode(inode.node_path, inode.data)
         d.addCallback(_success)
         return d
 
-    def deleteNode(self, content, node_path, cascade):
+    def deleteNode(self, inode, cascade):
         # content must be first argument
         def _success(rowcount):
             return dict(success="%d node(s) has been modified" % rowcount,
                         affected=rowcount)
 
-        d = dbBackend.deleteNode(node_path, content, cascade)
+        d = dbBackend.deleteNode(inode.node_path, inode.data, cascade)
         d.addCallback(_success)
         return d
 
-    def getNode(self, node_path, method):
+    def getNode(self, inode, method):
+        node_path = inode.node_path
         if method == 'override':
             d = dbBackend.getOverridedNode(node_path)
         elif method == 'combo':
@@ -95,15 +140,15 @@ class NodeService(Resource):
             raise UnsupportedGetNodeMethod()
         return d
 
-    def searchNode(self, node_path, q):
-        d = dbBackend.searchNode(node_path, q)
+    def searchNode(self, inode, q):
+        d = dbBackend.searchNode(inode.node_path, q)
         return d
 
-    def selectNode(self, node_path):
-        d = dbBackend.selectNode(node_path)
+    def selectNode(self, inode):
+        d = dbBackend.selectNode(inode.node_path)
         return d
 
-    def finish(self, value, request, format):
+    def finish(self, value, request):
         log.msg("finish value = %s" % str(value), level=logging.DEBUG)
         request.setHeader('Content-Type', 'application/json;charset=UTF-8')
         if isinstance(value, Failure):
@@ -136,6 +181,9 @@ class NodeService(Resource):
             elif isinstance(err, ValueError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
+            elif isinstance(err, ServiceAuthenticationError):
+                request.setResponseCode(403)
+                error = dict(error="forbidden")
             request.write(json_encode(error) + "\n")
         else:
             request.setResponseCode(200)
@@ -145,16 +193,16 @@ class NodeService(Resource):
                 (time.time() - self.startTime) * 1000))
         request.finish()
 
-    def updateNode(self, content, node_path):
+    def updateNode(self, inode):
         # content must be first argument
         def _success(rowcount):
             return dict(success="%d node(s) has been modified" % rowcount,
                         affected=rowcount)
 
-        if not isinstance(content, dict):
+        if not isinstance(inode.data, dict):
             raise InvalidInputData()
 
-        d = dbBackend.updateNode(node_path, content)
+        d = dbBackend.updateNode(inode.node_path, inode.data)
         d.addCallback(_success)
         return d
 
@@ -166,49 +214,58 @@ class NodeService(Resource):
         log.msg("Request cancelling.", level=logging.DEBUG)
         call.cancel()
 
-    def render_DELETE(self, request):
+    def prepare(self, request, content=True):
         node_path, format = NodeService._buildQuery(request)
+
+        if content:
+            request.content.seek(0, 0)
+            content = request.content.read().strip() or "{}"
+            data = json_decode(content)
+        else:
+            data = dict()
+        return INode(node_path=node_path,
+                     format=format,
+                     data=data,
+                     user=request.getUser(),
+                     passwd=md5sum(request.getPassword()).hexdigest())
+
+    def render_DELETE(self, request):
         cascade = False
         if "cascade" in request.args:
             cascade = request.args["cascade"][0]
 
-        request.content.seek(0, 0)
-        content = request.content.read()
-        d = deferToThread(lambda x: json_decode(x or '""'), content.strip())
-        d.addCallback(self.deleteNode, node_path, cascade)
-        d.addBoth(self.finish, request, format)
+        d = deferToThread(self.prepare, request)
         request.notifyFinish().addErrback(self.cancel, d)
+        d.addCallback(self.auth, self.X_DELETE)
+        d.addCallback(self.deleteNode, cascade)
+        d.addBoth(self.finish, request)
         return NOT_DONE_YET
 
     def render_GET(self, request):
-        node_path, format = NodeService._buildQuery(request)
-        if "q" in request.args:
-            d = self.searchNode(node_path, request.args["q"][0])
-        elif "method" in request.args:
-            method = request.args["method"][0].lower()
-            d = self.getNode(node_path, method)
-        else:
-            d = self.selectNode(node_path)
-        d.addBoth(self.finish, request, format)
+        d = deferToThread(self.prepare, request, False)
         request.notifyFinish().addErrback(self.cancel, d)
+        d.addCallback(self.auth, self.X_GET)
+        if "q" in request.args:
+            d.addCallback(self.searchNode, request.args["q"][0])
+        elif "method" in request.args:
+            d.addCallback(self.getNode, request.args["method"][0].lower())
+        else:
+            d.addCallback(self.selectNode)
+        d.addBoth(self.finish, request)
         return NOT_DONE_YET
 
     def render_POST(self, request):
-        node_path, format = NodeService._buildQuery(request)
-        request.content.seek(0, 0)
-        content = request.content.read()
-        d = deferToThread(lambda x: json_decode(x), content)
-        d.addCallback(self.updateNode, node_path)
-        d.addBoth(self.finish, request, format)
+        d = deferToThread(self.prepare, request)
         request.notifyFinish().addErrback(self.cancel, d)
+        d.addCallback(self.auth, self.X_POST)
+        d.addCallback(self.updateNode)
+        d.addBoth(self.finish, request)
         return NOT_DONE_YET
 
     def render_PUT(self, request):
-        node_path, format = NodeService._buildQuery(request)
-        request.content.seek(0, 0)
-        content = request.content.read()
-        d = deferToThread(lambda x: json_decode(x), content)
-        d.addCallback(self.createNode, node_path)
-        d.addBoth(self.finish, request, format)
+        d = deferToThread(self.prepare, request)
         request.notifyFinish().addErrback(self.cancel, d)
+        d.addCallback(self.auth, self.X_PUT)
+        d.addCallback(self.createNode)
+        d.addBoth(self.finish, request)
         return NOT_DONE_YET
