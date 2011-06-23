@@ -5,3 +5,4 @@ export MINITREE_DSN="host=localhost port=5432 user=postgres dbname=minitree"
 cd $(dirname $0)
 python test/select.py
 python test/creation.py
+
