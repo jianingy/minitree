@@ -56,11 +56,19 @@ div#right div#footer {
   font-size: 90%%;
 }
 </style>
+
 <link rel="stylesheet" type="text/css" href="http://static.jstree.com/v.1.0pre/_docs/!style.css" />
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script> 
 <script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.cookie.js"></script>
 <script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.hotkeys.js"></script>
 <script type="text/javascript" src="http://static.jstree.com/v.1.0pre/jquery.jstree.js"></script>
+<!--
+<link rel="stylesheet" type="text/css" href="http://shake/!style.css" />
+<script type="text/javascript" src="http://shake/jquery.min.js"></script> 
+<script type="text/javascript" src="http://shake/jquery.cookie.js"></script>
+<script type="text/javascript" src="http://shake/jquery.hotkeys.js"></script>
+<script type="text/javascript" src="http://shake/jquery.jstree.js"></script>
+-->
 </head>
 <body>
 <div id="wrapper">
@@ -98,7 +106,7 @@ $("#tree").jstree({
   }
 })
 .bind("select_node.jstree", function(event, data) {
-api = "/node?id=" + data.rslt.obj.attr("id")
+api = "/node?id=" + encodeURIComponent(data.rslt.obj.attr("id"));
 $.ajax({
   url: api,
   dataType: "json",

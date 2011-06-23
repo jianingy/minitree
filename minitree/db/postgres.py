@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from twisted.enterprise import adbapi
 from minitree.db import PathError, NodeNotFound, NodeCreationError
 from minitree.db import DataTypeError, ParentNotFound
@@ -87,6 +88,10 @@ last_modification timestamp default now())"
         else:
             raise PathError("Not enough level")
 
+        schema = schema.encode("UTF-8")
+        table = table.encode("UTF-8")
+        node_path = node_path.encode("UTF-8")
+
         return (schema, table, node_path)
 
     def connect(self, *args, **kwargs):
@@ -105,7 +110,7 @@ last_modification timestamp default now())"
                 txn.execute(sql % tablename, dict(q=q))
             else:
                 txn.execute(sql % tablename, dict(node_path=node_path))
-            return map(lambda x: x[0], txn.fetchall())
+            return map(lambda x: x[0].decode("UTF-8"), txn.fetchall())
         except psycopg2.ProgrammingError as e:
             err = unicode(e)
             txn.execute("ROLLBACK")
@@ -118,7 +123,8 @@ last_modification timestamp default now())"
 
     def _patch_path_heading(self, value, path):
         schema, table, node_path = self._splitPath(path)
-        return map(lambda x: ("%s.%s.%s" % (schema, table, x)).rstrip("."),
+        prefix = "%s.%s" % (schema, table)
+        return map(lambda x: ("%s.%s" % (prefix, x)).rstrip("."),
                    value)
 
     def getAncestors(self, path):
@@ -193,7 +199,7 @@ last_modification timestamp default now())"
             txn.execute(sql % tablename, dict(node_path=node_path))
             return txn.fetchall()
         except psycopg2.ProgrammingError as e:
-            err = unicode(e)
+            err = str(e)
             txn.execute("ROLLBACK")
             if self.regexNoSchema.match(err):
                 raise NodeNotFound("schema not found")

@@ -56,7 +56,8 @@ class NodeService(Resource):
 
     @staticmethod
     def _buildQuery(request):
-        uri = request.path[len(NodeService.serviceName) + 1:].rstrip("/")
+        decoded = request.path.decode("UTF-8")
+        uri = decoded[len(NodeService.serviceName) + 1:].rstrip("/")
 
         if uri.find(".") > -1:
             node_path, format = uri.split(".", 1)
