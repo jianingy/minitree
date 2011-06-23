@@ -29,7 +29,9 @@ class MiniTreeServiceMaker(object):
         from minitree import configure
         c = configure(options["config"])
         from minitree.db.postgres import dbBackend
-        dbBackend.connect(c.get("backend:main", "dsn"), cp_min=8, cp_max=16)
+        dbBackend.connect(c.get("backend:main", "dsn"),
+                          cp_min=int(c.get("backend:main", "cp_min")),
+                          cp_max=int(c.get("backend:main", "cp_max")))
 
         from minitree.service import site_configure
         site_root = site_configure(c)

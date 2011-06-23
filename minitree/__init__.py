@@ -17,6 +17,8 @@ dsn = host=%(server)s port=%(port)s dbname=%(database)s \
 user=%(user)s password=%(password)s
 user =
 password =
+cp_min = 2
+cp_max = 4
 """
     p = ConfigParser()
     p.readfp(StringIO(default))
