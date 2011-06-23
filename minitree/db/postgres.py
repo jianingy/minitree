@@ -113,7 +113,7 @@ last_modification timestamp default now())"
                 txn.execute(sql % tablename, dict(node_path=node_path))
             return map(lambda x: x[0].decode("UTF-8"), txn.fetchall())
         except psycopg2.ProgrammingError as e:
-            err = unicode(e)
+            err = str(e)
             txn.execute("ROLLBACK")
             if self.regexNoSchema.match(err):
                 raise NodeNotFound("schema not found")
@@ -240,7 +240,7 @@ last_modification timestamp default now())"
             txn.execute(self.createSQL % tablename, [node_path, hstore_value])
             return txn._cursor.rowcount
         except psycopg2.IntegrityError as e:
-            err = unicode(e)
+            err = str(e)
             if err.startswith("duplicate key value violates"):
                 raise PathDuplicatedError("%s already exists" % node_path)
         except psycopg2.ProgrammingError as e:
