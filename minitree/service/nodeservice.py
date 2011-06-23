@@ -187,14 +187,14 @@ class NodeService(Resource):
                              instance="service.NodeSerivce.InvalidInputData")
             elif isinstance(err, ValueError):
                 request.setResponseCode(400)
-                error = dict(error=str(err))
+                error = dict(error=str(err), instance="ValueError")
             elif isinstance(err, ServiceAuthenticationError):
                 request.setResponseCode(403)
                 error = dict(error="forbidden",
                              instance="service.NodeService.InvalidInputData")
             elif isinstance(err, UnicodeDecodeError):
                 request.setResponseCode(400)
-                error = dict(error="character encoding error",
+                error = dict(error=str(err),
                              instance="UnicodeDecodeError")
             request.write(json_encode(error) + "\n")
         else:
