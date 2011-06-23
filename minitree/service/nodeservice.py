@@ -161,30 +161,41 @@ class NodeService(Resource):
                 return None
             elif isinstance(err, minitree.db.NodeNotFound):
                 request.setResponseCode(404)
-                error = dict(error="node not found", message=err.message)
+                error = dict(error="node not found", message=err.message,
+                             instance="db.NodeNotFound")
             elif isinstance(err, minitree.db.ParentNotFound):
                 request.setResponseCode(400)
                 error = dict(error="parent node not found",
-                             message=err.message)
+                             message=err.message,
+                             instance="db.ParentNotFound")
             elif isinstance(err, minitree.db.PathDuplicatedError):
                 request.setResponseCode(400)
-                error = dict(error=str(err))
+                error = dict(error=str(err),
+                             instance="db.PathDuplicatedError")
             elif (isinstance(err, minitree.db.PathError) or
                   isinstance(err, cjson.DecodeError)):
                 request.setResponseCode(400)
-                error = dict(error=str(err))
+                error = dict(error=str(err),
+                             instance="db.PathError")
             elif isinstance(err, minitree.db.DataTypeError):
                 request.setResponseCode(400)
-                error = dict(error=str(err))
+                error = dict(error=str(err),
+                             instance="db.DataTypeError")
             elif isinstance(err, InvalidInputData):
                 request.setResponseCode(400)
-                error = dict(error=str(err))
+                error = dict(error=str(err),
+                             instance="service.NodeSerivce.InvalidInputData")
             elif isinstance(err, ValueError):
                 request.setResponseCode(400)
                 error = dict(error=str(err))
             elif isinstance(err, ServiceAuthenticationError):
                 request.setResponseCode(403)
-                error = dict(error="forbidden")
+                error = dict(error="forbidden",
+                             instance="service.NodeService.InvalidInputData")
+            elif isinstance(err, UnicodeDecodeError):
+                request.setResponseCode(400)
+                error = dict(error="character encoding error",
+                             instance="UnicodeDecodeError")
             request.write(json_encode(error) + "\n")
         else:
             request.setResponseCode(200)
