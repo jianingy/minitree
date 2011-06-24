@@ -8,7 +8,7 @@ from twisted.application import internet
 
 class Options(usage.Options):
     optParameters = [
-        ["socket", "s", "minitree.sock",
+        ["socket", "s", "",
          "Path (or name) of UNIX/TCP socket to bind to. Overrides --port"],
         ["config", "c", "etc/default.ini",
          "Path (or name) of minitree configuration."],
@@ -38,7 +38,7 @@ class MiniTreeServiceMaker(object):
         from twisted.web import server
         site = server.Site(site_root)
 
-        if "socket" in options:
+        if "socket" in options and options["socket"]:
             return internet.UNIXServer(options["socket"], site)
         else:
             return internet.TCPServer(int(options["port"] or
