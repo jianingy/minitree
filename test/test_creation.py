@@ -112,6 +112,17 @@ WHERE node_path='dbval' LIMIT 1")
         data = cursor.fetchall()
         self.assertEqual(data[0][0], '"key_a"=>"value_a", "中文键"=>"中文值"')
 
+    def test_create_unicode_data(self):
+        code = 200
+        data = "/node/test/中国"
+
+        try:
+            ret = url_access(self.base + data, method="PUT").read()
+        except urllib2.HTTPError as e:
+            code = e.code
+            ret  = e.read()
+
+        self.assertEqual(code, 200)
 
 if __name__ == "__main__":
     unittest2.main()
