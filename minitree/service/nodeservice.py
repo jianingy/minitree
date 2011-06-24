@@ -81,6 +81,14 @@ class NodeService(Resource):
         def _auth(user, inode):
             if user["password"] != inode.passwd:
                 raise ServiceAuthenticationError()
+            ns = user["ns"].split(",")
+            rns = inode.node_path.split("/")
+            if len(rns) > 1:
+                rns = '.'.join(rns[0:2])
+            else:
+                rns = rns[0]
+            if rns.lstrip(".") not in ns:
+                raise ServiceAuthenticationError("this ns is not allowed")
             return inode
 
         def _fail(e):
@@ -191,7 +199,9 @@ class NodeService(Resource):
             elif isinstance(err, ServiceAuthenticationError):
                 request.setResponseCode(403)
                 error = dict(error="forbidden",
-                             instance="service.NodeService.InvalidInputData")
+                             message=str(err),
+                             instance="service.NodeService."
+                             "ServiceAuthenticationError")
             elif isinstance(err, UnicodeDecodeError):
                 request.setResponseCode(400)
                 error = dict(error=str(err),
