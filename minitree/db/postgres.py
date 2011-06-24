@@ -42,6 +42,7 @@ WHERE node_path = %%s"
     createTableSQL = "CREATE TABLE %s(id SERIAL PRIMARY KEY, \
 node_path ltree unique, node_value hstore, \
 last_modification timestamp default now())"
+    initTableSQL = "INSERT INTO %s(node_path) VALUES('')"
     createSchemaSQL = "CREATE SCHEMA %s"
 
     regexNoTable = re.compile(r"relation \"[^\"]+\" does not exist")
@@ -253,6 +254,7 @@ last_modification timestamp default now())"
             elif self.regexNoTable.match(err):
                 txn.execute("ROLLBACK")
                 txn.execute(self.createTableSQL % tablename)
+                txn.execute(self.initTableSQL % tablename)                
                 return self._createNode(txn, path, content,
                                         ncall=ncall + 1)
 
