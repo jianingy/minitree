@@ -12,7 +12,7 @@ from cjson import encode as json_encode, decode as json_decode
 import logging
 import sys
 
-MINITREE_SERVER = "http://localhost:8000"
+MINITREE_SERVER = "http://localhost:9999"
 
 class WebAdmin(Resource):
 
@@ -112,7 +112,7 @@ def main(c):
     site = server.Site(root)
 
     from twisted.internet import reactor
-    reactor.listenTCP(9999, site)
+    reactor.listenTCP(9000, site)
     reactor.run()
 
 if __name__ == '__main__':
