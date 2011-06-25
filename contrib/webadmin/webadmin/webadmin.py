@@ -8,7 +8,7 @@ from twisted.internet.defer import DeferredList
 from twisted.web.server import NOT_DONE_YET
 from twisted.python.failure import Failure
 from twisted.web import client
-from cjson import encode as json_encode, decode as json_decode
+from ujson import encode as json_encode, decode as json_decode
 
 
 class WebAdmin(Resource):

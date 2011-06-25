@@ -7,8 +7,7 @@ from twisted.python.failure import Failure
 from hashlib import md5 as md5sum
 from collections import namedtuple
 from minitree.db.postgres import dbBackend
-from cjson import encode as json_encode, decode as json_decode
-import cjson
+from ujson import encode as json_encode, decode as json_decode
 import time
 import minitree.db
 import logging
@@ -180,8 +179,7 @@ class NodeService(Resource):
                 request.setResponseCode(400)
                 error = dict(error=str(err),
                              instance="db.PathDuplicatedError")
-            elif (isinstance(err, minitree.db.PathError) or
-                  isinstance(err, cjson.DecodeError)):
+            elif isinstance(err, minitree.db.PathError):
                 request.setResponseCode(400)
                 error = dict(error=str(err),
                              instance="db.PathError")
