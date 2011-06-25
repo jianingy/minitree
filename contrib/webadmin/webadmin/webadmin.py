@@ -29,7 +29,11 @@ class WebAdmin(Resource):
             if isinstance(ret, Failure):
                 return dict(data=name, state="", attr=dict(id=value))
             else:
-                return dict(data=name, state="closed", attr=dict(id=value))
+                ret = json_decode(ret)
+                if len(ret) > 0:
+                    return dict(data=name, state="closed", attr=dict(id=value))
+                else:
+                    return dict(data=name, state="", attr=dict(id=value))
 
         def _check(value):
             url = "%s/node/%s?method=children" % \
@@ -51,7 +55,6 @@ class WebAdmin(Resource):
             err = value.value
             if isinstance(err, defer.CancelledError):
                 return None
-        print value
         request.setHeader("Content-Type", "text/html; charset=UTF-8")
         request.write(value)
         request.finish()
