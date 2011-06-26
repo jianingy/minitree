@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from twisted.enterprise import adbapi
+from twisted.python.failure import Failure
 from minitree.db import PathError, NodeNotFound, NodeCreationError
 from minitree.db import DataTypeError, ParentNotFound
 from minitree.db import PathDuplicatedError
 from collections import defaultdict
+from txpostgres import txpostgres
 from os.path import splitext
 import psycopg2
 import re
@@ -42,8 +43,8 @@ WHERE node_path = %%s"
     createTableSQL = "CREATE TABLE %s(id SERIAL PRIMARY KEY, \
 node_path ltree unique, node_value hstore, \
 last_modification timestamp default now())"
-    initTableSQL = "INSERT INTO %s(node_path) VALUES('')"
     createSchemaSQL = "CREATE SCHEMA %s"
+    initTableSQL = "INSERT INTO %s(node_path) VALUES('')"
 
     regexNoTable = re.compile(r"relation \"[^\"]+\" does not exist")
     regexNoSchema = re.compile(r"schema \"[^\"]+\" does not exist")
@@ -98,24 +99,36 @@ last_modification timestamp default now())"
 
     def connect(self, *args, **kwargs):
         assert(self.pool == None)
-        self.pool = adbapi.ConnectionPool("psycopg2", *args, **kwargs)
+        self.pool = txpostgres.ConnectionPool(None, *args, **kwargs)
+        return self.pool.start()
 
-    def _selectPath(self, txn, path, sql, q=None):
+    def _selectPath(self, c, path, sql, q=None):
+
+        def _exists(c):
+            if not c.fetchone():
+                raise  NodeNotFound()
+
+        def _print(_, c):
+            print _, c, "<===="
+            return c
+
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
-            txn.execute(self.selectOneSQL % tablename,
-                        dict(node_path=node_path))
-            if not txn.fetchall():
-                raise NodeNotFound()
+            d = c.execute(self.selectOneSQL % tablename,
+                          dict(node_path=node_path))
+            d.addCallback(_exists)
             if q:
-                txn.execute(sql % tablename, dict(q=q))
+                d.addCallback(lambda _, c: c.execute(sql % tablename,
+                                                     dict(q=q)), c)
             else:
-                txn.execute(sql % tablename, dict(node_path=node_path))
-            return map(lambda x: x[0].decode("UTF-8"), txn.fetchall())
+                d.addCallback(lambda _, c: c.execute(
+                        sql % tablename, dict(node_path=node_path)), c)
+            d.addCallback(lambda c: map(lambda x: x[0].decode("UTF-8"),
+                                        c.fetchall()))
+            return d
         except psycopg2.ProgrammingError as e:
             err = str(e)
-            txn.execute("ROLLBACK")
             if self.regexNoSchema.match(err):
                 raise NodeNotFound("schema not found")
             elif self.regexNoTable.match(err):
@@ -164,10 +177,13 @@ last_modification timestamp default now())"
         return d
 
     def getOverridedNode(self, path):
+        def _decode(x):
+            return (x[0].decode("UTF-8"), x[1].decode("UTF-8"))
+
         d = self.pool.runInteraction(self._selectNode, path,
                                      self.selectOverrideSQL)
-        d.addCallback(lambda r: dict(map(lambda x: (x[0].decode("UTF-8"),
-                                                    x[1].decode("UTF-8")), r)))
+        d.addCallback(lambda x: dict(map(_decode, x)))
+
         return d
 
     def getComboNode(self, path):
@@ -179,9 +195,7 @@ last_modification timestamp default now())"
 
         d = self.pool.runInteraction(self._selectNode, path,
                                      self.selectComboSQL)
-        d.addCallback(_combo)
-
-        return d
+        return d.addCallback(_combo)
 
     def _selectDBObject(self, txn, name, sql):
         txn.execute(sql, dict(name=name))
@@ -191,30 +205,43 @@ last_modification timestamp default now())"
         else:
             raise NodeNotFound()
 
-    def _selectNode(self, txn, path, sql):
+    def _selectNodeFinish(self, c):
+        if isinstance(c, Failure):
+            exc = c.value
+            s_exc = str(exc)
+            if isinstance(exc, psycopg2.ProgrammingError):
+                if self.regexNoSchema.match(s_exc):
+                    raise NodeNotFound("schema not found")
+                elif self.regexNoTable.match(s_exc):
+                    raise NodeNotFound("collection not found")
+
+            raise c.value
+
+        return c.fetchall()
+
+    def _selectNode(self, c, path, sql):
+
+        def _exists(c):
+            if not c.fetchone():
+                raise  NodeNotFound()
+
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
-        try:
-            txn.execute(self.selectOneSQL % tablename,
-                        dict(node_path=node_path))
-            if not txn.fetchall():
-                raise NodeNotFound()
-            txn.execute(sql % tablename, dict(node_path=node_path))
-            return txn.fetchall()
-        except psycopg2.ProgrammingError as e:
-            err = str(e)
-            txn.execute("ROLLBACK")
-            if self.regexNoSchema.match(err):
-                raise NodeNotFound("schema not found")
-            elif self.regexNoTable.match(err):
-                raise NodeNotFound("collection not found")
-            else:
-                raise
+
+        d = c.execute(self.selectOneSQL % tablename, dict(node_path=node_path))
+        d.addCallback(_exists)
+        d.addCallback(lambda _, c: c.execute(sql % tablename,
+                                             dict(node_path=node_path)), c)
+        d.addBoth(self._selectNodeFinish)
+
+        return d
 
     def selectNode(self, path):
+        def _decode(x):
+            return (x[0].decode("UTF-8"), x[1].decode("UTF-8"))
+
         d = self.pool.runInteraction(self._selectNode, path, self.selectSQL)
-        d.addCallback(lambda r: dict(map(lambda x: (x[0].decode("UTF-8"),
-                                                    x[1].decode("UTF-8")), r)))
+        d.addCallback(lambda x: dict(map(_decode, x)))
         return d
 
     def searchNode(self, path, q):
@@ -225,38 +252,60 @@ last_modification timestamp default now())"
 
         return d
 
-    def _createNode(self, txn, path, content, ncall=0):
+    def _createFinish(self, e, c, inode, icall):
+        if isinstance(e, Failure):
+            schema, tablename, node_path = inode
+            path, content, ncall = icall
+            exc = e.value
+            s_exc = str(exc)
+            if isinstance(exc, psycopg2.IntegrityError):
+                if s_exc.startswith("duplicate key value violates"):
+                    raise PathDuplicatedError("%s already exists" % node_path)
+            elif isinstance(exc, psycopg2.ProgrammingError):
+                if self.regexNoSchema.match(s_exc):
+                    d = c.execute("ROLLBACK")
+                    d.addCallback(lambda c:
+                                      c.execute(self.createSchemaSQL % schema))
+                    d.addCallback(self._createNode, path, content,
+                                  ncall=ncall + 1)
+                    return d
+                elif self.regexNoTable.match(s_exc):
+                    d = c.execute("ROLLBACK")
+                    d.addCallback(lambda c: c.execute(
+                            self.createTableSQL % tablename))
+                    if node_path:
+                        d.addCallback(lambda c: c.execute(
+                                self.initTableSQL % tablename))
+                    d.addCallback(self._createNode, path, content,
+                                  ncall=ncall + 1)
+                    return d
+            raise exc
+        else:
+            return c._cursor.rowcount
+
+    def _createNode(self, c, path, content, ncall=0):
+
+        def _exists(c):
+            if not c.fetchone():
+                raise  NodeNotFound()
+
         if ncall > 3:
             raise NodeCreationError("internal error")
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         hstore_value = self._serialize_hstore(content)
-        try:
-            parent_path, rest = splitext(node_path)
-            if rest:
-                txn.execute(self.selectOneSQL % tablename,
-                            dict(node_path=parent_path))
-                if not txn.fetchall():
-                    raise ParentNotFound()
-            txn.execute(self.createSQL % tablename, [node_path, hstore_value])
-            return txn._cursor.rowcount
-        except psycopg2.IntegrityError as e:
-            err = str(e)
-            if err.startswith("duplicate key value violates"):
-                raise PathDuplicatedError("%s already exists" % node_path)
-        except psycopg2.ProgrammingError as e:
-            err = str(e)
-            if self.regexNoSchema.match(err):
-                txn.execute("ROLLBACK")
-                txn.execute(self.createSchemaSQL % schema)
-                return self._createNode(txn, path, content,
-                                        ncall=ncall + 1)
-            elif self.regexNoTable.match(err):
-                txn.execute("ROLLBACK")
-                txn.execute(self.createTableSQL % tablename)
-                txn.execute(self.initTableSQL % tablename)                
-                return self._createNode(txn, path, content,
-                                        ncall=ncall + 1)
+
+        parent_path, rest = splitext(node_path)
+        d = c.execute(self.selectOneSQL % tablename,
+                      dict(node_path=parent_path))
+        if rest:  # check exists when first execution
+            d.addCallback(_exists)
+        d.addCallback(lambda _, c: c.execute(self.createSQL % tablename,
+                                             [node_path, hstore_value]), c)
+        d.addBoth(self._createFinish, c, (schema, tablename, node_path),
+                  (path, content, ncall))
+
+        return d
 
     def createNode(self, path, content):
         return self.pool.runInteraction(self._createNode, path, content)
@@ -285,13 +334,15 @@ last_modification timestamp default now())"
         return self.pool.runInteraction(self._deleteNode, path, content,
                                         cascade)
 
-    def _updateNode(self, txn, path, content):
+    def _updateNode(self, c, path, content):
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         hstore_value = self._serialize_hstore(content)
         try:
-            txn.execute(self.updateSQL % tablename, [hstore_value, node_path])
-            return txn._cursor.rowcount
+            d = c.execute(self.updateSQL % tablename,
+                          [hstore_value, node_path])
+            d.addCallback(lambda _, c: c._cursor.rowcount, c)
+            return d
         except:
             return 0
 

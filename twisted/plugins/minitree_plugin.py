@@ -29,14 +29,15 @@ class MiniTreeServiceMaker(object):
         from minitree import configure
         c = configure(options["config"])
         from minitree.db.postgres import dbBackend
-        dbBackend.connect(c.get("backend:main", "dsn"),
-                          cp_min=int(c.get("backend:main", "cp_min")),
-                          cp_max=int(c.get("backend:main", "cp_max")))
+        dbBackend.connect(c.get("backend:main", "dsn"))
 
         from minitree.service import site_configure
         site_root = site_configure(c)
         from twisted.web import server
         site = server.Site(site_root)
+        from twisted.internet import reactor
+
+        reactor.suggestThreadPoolSize(128)
 
         if "socket" in options and options["socket"]:
             return internet.UNIXServer(options["socket"], site)
