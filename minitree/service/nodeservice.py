@@ -240,7 +240,10 @@ class NodeService(Resource):
         if content:
             request.content.seek(0, 0)
             content = request.content.read().strip() or "{}"
-            data = json_decode(content)
+            try:
+                data = json_decode(content)
+            except:
+                raise InvalidInputData("Invalid JSON")
         else:
             data = dict()
         return INode(node_path=node_path,
