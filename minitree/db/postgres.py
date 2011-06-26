@@ -254,7 +254,8 @@ last_modification timestamp default now())"
             elif self.regexNoTable.match(err):
                 txn.execute("ROLLBACK")
                 txn.execute(self.createTableSQL % tablename)
-                txn.execute(self.initTableSQL % tablename)                
+                if node_path:
+                    txn.execute(self.initTableSQL % tablename)
                 return self._createNode(txn, path, content,
                                         ncall=ncall + 1)
 
