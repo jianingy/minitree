@@ -306,6 +306,8 @@ last_modification timestamp default now())"
                   (path, content, ncall))
 
         return d
+                if node_path:
+                    txn.execute(self.initTableSQL % tablename)
 
     def createNode(self, path, content):
         return self.pool.runInteraction(self._createNode, path, content)
