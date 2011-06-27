@@ -108,10 +108,6 @@ last_modification timestamp default now())"
             if not c.fetchone():
                 raise  NodeNotFound()
 
-        def _print(_, c):
-            print _, c, "<===="
-            return c
-
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         try:
