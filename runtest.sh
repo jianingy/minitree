@@ -24,6 +24,7 @@ fi
 
 export MINITREE_SERVER="http://127.0.0.1:8000"
 export MINITREE_DSN="host=$dbhost port=$port user=$dbuser dbname=$dbname"
+echo $MINITREE_DSN
 
 cd $(dirname $0)
 cd test
