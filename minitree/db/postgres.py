@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+from twisted.internet import defer
 from twisted.python.failure import Failure
 from minitree.db import PathError, NodeNotFound, NodeCreationError
-from minitree.db import DataTypeError, ParentNotFound
+from minitree.db import DataTypeError
 from minitree.db import PathDuplicatedError
 from collections import defaultdict
 from txpostgres import txpostgres
@@ -311,25 +312,28 @@ last_modification timestamp default now())"
     def createNode(self, path, content):
         return self.pool.runInteraction(self._createNode, path, content)
 
-    def _deleteNode(self, txn, path, content, cascade=False):
+    def _deleteNode(self, c, path, content, cascade=False):
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
         if content:
             hstore_key = content.keys()
-            txn.execute(self.deleteSQL % tablename, [hstore_key, node_path])
-            return txn._cursor.rowcount
+            d = c.execute(self.deleteSQL % tablename, [hstore_key, node_path])
+            d.addCallback(lambda c: c._cursor.rowcount)
+            return d
         elif node_path:
             if cascade:
-                txn.execute(self.deleteNodeCascadedSQL % tablename,
+                d = c.execute(self.deleteNodeCascadedSQL % tablename,
                             [node_path])
             else:
-                txn.execute(self.deleteNodeSQL % tablename, [node_path])
-            return txn._cursor.rowcount
+                d = c.execute(self.deleteNodeSQL % tablename, [node_path])
+            d.addCallback(lambda c: c._cursor.rowcount)
+            return d
         elif cascade:
-            txn.execute(self.dropTableSQL % tablename)
-            return txn._cursor.rowcount
+            d = c.execute(self.dropTableSQL % tablename)
+            d.addCallback(lambda c: c._cursor.rowcount)
+            return d
         else:
-            return 0
+            return defer.succeed(0)
 
     def deleteNode(self, path, content, cascade):
         return self.pool.runInteraction(self._deleteNode, path, content,
@@ -342,7 +346,7 @@ last_modification timestamp default now())"
         try:
             d = c.execute(self.updateSQL % tablename,
                           [hstore_value, node_path])
-            d.addCallback(lambda _, c: c._cursor.rowcount, c)
+            d.addCallback(lambda c: c._cursor.rowcount)
             return d
         except:
             return 0
