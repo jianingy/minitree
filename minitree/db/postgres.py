@@ -193,13 +193,18 @@ last_modification timestamp default now())"
                                      self.selectComboSQL)
         return d.addCallback(_combo)
 
-    def _selectDBObject(self, txn, name, sql):
-        txn.execute(sql, dict(name=name))
-        result = txn.fetchall()
-        if result:
-            return map(lambda x: x[0].decode("UTF-8"), result)
-        else:
-            raise NodeNotFound()
+    def _selectDBObject(self, c, name, sql):
+
+        def _finish(result, c):
+            if isinstance(result, list) and result:
+                return map(lambda x: x[0].decode("UTF-8"), result)
+            else:
+                raise NodeNotFound()
+
+        d = c.execute(sql, dict(name=name))
+        d.addCallback(lambda c: c.fetchall())
+        d.addBoth(_finish, c)
+        return d
 
     def _selectNodeFinish(self, c):
         if isinstance(c, Failure):
