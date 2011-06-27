@@ -1,4 +1,3 @@
-__all__ = ['InvalidPathError']
 
 
 class PathError(Exception):
