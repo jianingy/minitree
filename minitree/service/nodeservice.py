@@ -1,4 +1,3 @@
-from twisted.internet.threads import deferToThread
 from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -234,7 +233,7 @@ class NodeService(Resource):
         log.msg("Request cancelling.", level=logging.DEBUG)
         call.cancel()
 
-    def prepare(self, request, content=True):
+    def _prepare(self, request, content=True):
         node_path, format = NodeService._buildQuery(request)
 
         if content:
@@ -252,12 +251,18 @@ class NodeService(Resource):
                      user=request.getUser(),
                      passwd=md5sum(request.getPassword()).hexdigest())
 
+    def prepare(self, request, content=True):
+        try:
+            return defer.succeed(self._prepare(request, content))
+        except Exception as e:
+            return defer.fail(Failure(e))
+
     def render_DELETE(self, request):
         cascade = False
         if "cascade" in request.args:
             cascade = request.args["cascade"][0]
 
-        d = deferToThread(self.prepare, request)
+        d = self.prepare(request)
         request.notifyFinish().addErrback(self.cancel, d)
         d.addCallback(self.auth, self.X_DELETE)
         d.addCallback(self.deleteNode, cascade)
@@ -265,7 +270,7 @@ class NodeService(Resource):
         return NOT_DONE_YET
 
     def render_GET(self, request):
-        d = deferToThread(self.prepare, request, False)
+        d = self.prepare(request, False)
         request.notifyFinish().addErrback(self.cancel, d)
         d.addCallback(self.auth, self.X_GET)
         if "q" in request.args:
@@ -278,7 +283,7 @@ class NodeService(Resource):
         return NOT_DONE_YET
 
     def render_POST(self, request):
-        d = deferToThread(self.prepare, request)
+        d = self.prepare(request)
         request.notifyFinish().addErrback(self.cancel, d)
         d.addCallback(self.auth, self.X_POST)
         d.addCallback(self.updateNode)
@@ -286,7 +291,7 @@ class NodeService(Resource):
         return NOT_DONE_YET
 
     def render_PUT(self, request):
-        d = deferToThread(self.prepare, request)
+        d = self.prepare(request)
         request.notifyFinish().addErrback(self.cancel, d)
         d.addCallback(self.auth, self.X_PUT)
         d.addCallback(self.createNode)
