@@ -351,7 +351,7 @@ last_modification timestamp default now())"
 
             raise c.value
 
-        return c._cursor.rowcount()
+        return c._cursor.rowcount
 
     def _updateNode(self, c, path, content):
         schema, table, node_path = self._splitPath(path)
