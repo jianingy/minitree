@@ -339,6 +339,20 @@ last_modification timestamp default now())"
         return self.pool.runInteraction(self._deleteNode, path, content,
                                         cascade)
 
+    def _updateNodeFinish(self, c):
+        if isinstance(c, Failure):
+            exc = c.value
+            s_exc = str(exc)
+            if isinstance(exc, psycopg2.ProgrammingError):
+                if self.regexNoSchema.match(s_exc):
+                    raise NodeNotFound("schema not found")
+                elif self.regexNoTable.match(s_exc):
+                    raise NodeNotFound("collection not found")
+
+            raise c.value
+
+        return c._cursor.rowcount()
+
     def _updateNode(self, c, path, content):
         schema, table, node_path = self._splitPath(path)
         tablename = self._buildTableName(schema, table)
@@ -346,7 +360,7 @@ last_modification timestamp default now())"
         try:
             d = c.execute(self.updateSQL % tablename,
                           [hstore_value, node_path])
-            d.addCallback(lambda c: c._cursor.rowcount)
+            d.addBoth(self._updateNodeFinish)
             return d
         except:
             return 0
