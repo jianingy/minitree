@@ -2,5 +2,9 @@ syntax: glob
 *.pyo
 *.pyc
 .ropeproject
+*.diff
+etc/auth.ini
+etc/default.ini
 twisted/plugins/dropin.cache
+twisted.pid
 candy
