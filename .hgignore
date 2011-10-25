@@ -2,9 +2,13 @@ syntax: glob
 *.pyo
 *.pyc
 .ropeproject
-*.diff
+*.ini
+diff
 etc/auth.ini
 etc/default.ini
 twisted/plugins/dropin.cache
-twisted.pid
+twistd.pid
 candy
+minitree/service/product.py
+minitree/service/nodeservice.py
+tools/role.sql

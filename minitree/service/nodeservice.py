@@ -137,6 +137,8 @@ class NodeService(Resource):
             d = dbBackend.getOverridedNode(node_path)
         elif method == 'combo':
             d = dbBackend.getComboNode(node_path)
+        elif method == 'rcombo':
+            d = dbBackend.getReverseComboNode(node_path)
         elif method == 'ancestors':
             d = dbBackend.getAncestors(node_path)
         elif method == 'children':

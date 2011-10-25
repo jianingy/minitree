@@ -23,6 +23,8 @@ class Postgres(object):
 FROM %s WHERE node_path @> %%(node_path)s))"
     selectComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
 FROM %s WHERE node_path @> %%(node_path)s"
+    selectReverseComboSQL = "SELECT (each(node_value)).key, (each(node_value)).value \
+FROM %s WHERE node_path <@ %%(node_path)s"
     selectAncestorSQL = "SELECT node_path FROM %s \
 WHERE node_path @> %%(node_path)s AND node_path != %%(node_path)s"
     selectAllSQL = "SELECT node_path FROM %s WHERE node_path ~ %%(q)s"
@@ -193,6 +195,17 @@ last_modification timestamp default now())"
         d = self.pool.runInteraction(self._selectNode, path,
                                      self.selectComboSQL)
         return d.addCallback(_combo)
+
+    def getReverseComboNode(self, path):
+
+        def _rcombo(result):
+            rcombo = defaultdict(list)
+            map(lambda x: rcombo[x[0]].append(x[1].decode("UTF-8")), result)
+            return rcombo
+
+        d = self.pool.runInteraction(self._selectNode, path,
+                                     self.selectReverseComboSQL)
+        return d.addCallback(_rcombo)
 
     def _selectDBObject(self, c, name, sql):
 
